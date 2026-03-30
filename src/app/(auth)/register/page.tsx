@@ -92,24 +92,6 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-1.5 shadow-sm mb-6 flex gap-1">
-          <span className="flex-1 text-center bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold">
-            👤 Покупатель
-          </span>
-          <Link
-            href="/register-pharmacy"
-            className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
-          >
-            🏪 Аптека
-          </Link>
-          <Link
-            href="/register-courier"
-            className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
-          >
-            🚴 Курьер
-          </Link>
-        </div>
-
         <div className="bg-white rounded-2xl p-6 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             {[

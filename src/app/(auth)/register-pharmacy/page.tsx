@@ -50,7 +50,7 @@ export default function RegisterPharmacyPage() {
       }
 
       // 2. Создаём профиль + аптеку через API (service role обходит RLS)
-      const res = await fetch("/api/auth/register-pharmacy", {
+      const res = await fetch("/api/register-pharmacy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,24 +98,6 @@ export default function RegisterPharmacyPage() {
           <p className="text-gray-500 text-sm mt-1">
             Подключите аптеку к платформе
           </p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-1.5 shadow-sm mb-6 flex gap-1">
-          <Link
-            href="/register"
-            className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
-          >
-            👤 Покупатель
-          </Link>
-          <span className="flex-1 text-center bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold">
-            🏪 Аптека
-          </span>
-          <Link
-            href="/register-courier"
-            className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50"
-          >
-            🚴 Курьер
-          </Link>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm">

@@ -1,5 +1,5 @@
 "use client";
-// ЗАМЕНИ: src/hooks/useAuth.ts
+// src/hooks/useAuth.ts
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -11,11 +11,16 @@ interface AuthState {
   loading: boolean;
 }
 
+// Client-side кеш — живёт пока открыта вкладка
+// Это безопасно: код выполняется только в браузере конкретного пользователя
+let _cachedUser: User | null = null;
+let _cacheReady = false;
+
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({
     supabaseUser: null,
-    user: null,
-    loading: true,
+    user: _cachedUser,
+    loading: !_cacheReady,
   });
 
   useEffect(() => {
@@ -26,7 +31,15 @@ export function useAuth(): AuthState {
       if (!mounted) return;
 
       if (!supabaseUser) {
+        _cachedUser = null;
+        _cacheReady = true;
         setState({ supabaseUser: null, user: null, loading: false });
+        return;
+      }
+
+      // Есть кеш для этого юзера — не делаем повторный запрос
+      if (_cacheReady && _cachedUser) {
+        setState({ supabaseUser, user: _cachedUser, loading: false });
         return;
       }
 
@@ -37,16 +50,21 @@ export function useAuth(): AuthState {
         .single();
 
       if (!mounted) return;
+
+      _cachedUser = user;
+      _cacheReady = true;
       setState({ supabaseUser, user, loading: false });
     };
 
-    // Получаем текущую сессию один раз при маунте
     supabase.auth.getUser().then(({ data }) => fetchUser(data.user));
 
-    // Слушаем только реальные события смены сессии
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        _cachedUser = null;
+        _cacheReady = false;
+      }
       if (
         event === "SIGNED_IN" ||
         event === "SIGNED_OUT" ||
@@ -66,6 +84,8 @@ export function useAuth(): AuthState {
 }
 
 export async function signOut() {
+  _cachedUser = null;
+  _cacheReady = false;
   const supabase = createClient();
   await supabase.auth.signOut();
   window.location.href = "/login";

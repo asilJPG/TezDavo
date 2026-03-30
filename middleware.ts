@@ -41,6 +41,7 @@ export async function middleware(request: NextRequest) {
     '/courier/dashboard',
     '/admin',
   ]
+
   const isProtected = protectedPrefixes.some(p => path.startsWith(p))
 
   if (isProtected && !user) {
@@ -50,14 +51,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // Авторизованным не нужны страницы входа/регистрации
-  const authOnlyPages = ['/login', '/register', '/register-pharmacy', '/register-courier']
-  if (user && authOnlyPages.includes(path)) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
-  }
+const authPages = [
+  '/login',
+  '/register',
+  '/register-pharmacy',
+  '/register-courier',
+]
 
-  return response
+if (user && authPages.includes(path)) {
+  const url = request.nextUrl.clone()
+  url.pathname = '/'
+  return NextResponse.redirect(url)
 }
 
 export const config = {

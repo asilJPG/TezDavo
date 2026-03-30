@@ -1,10 +1,10 @@
 "use client";
-// src/app/(auth)/login/page.tsx
+// src/app/(auth)/login-pharmacy/page.tsx
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 
-export default function LoginPage() {
+export default function LoginPharmacyPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,33 +14,33 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     const supabase = createClient();
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
     if (authError) {
       setError("Неверный email или пароль");
       setLoading(false);
       return;
     }
 
-    await supabase.auth.getSession();
-
-    // Редирект по роли
+    // Проверяем роль
     const { data: user } = await supabase
       .from("users")
       .select("role")
       .eq("auth_id", data.user.id)
       .single();
 
-    if (user?.role === "pharmacy") window.location.href = "/pharmacy/dashboard";
-    else if (user?.role === "courier")
-      window.location.href = "/courier/dashboard";
-    else if (user?.role === "admin") window.location.href = "/admin";
-    else window.location.href = "/";
+    if (!user || user.role !== "pharmacy") {
+      await supabase.auth.signOut();
+      setError("Этот аккаунт не является аптекой");
+      setLoading(false);
+      return;
+    }
+
+    await supabase.auth.getSession();
+    window.location.href = "/pharmacy/dashboard";
   };
 
   return (
@@ -48,13 +48,11 @@ export default function LoginPage() {
       <div className="max-w-md mx-auto w-full">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <span className="text-3xl">💊</span>
+            <span className="text-3xl">🏪</span>
             <span className="font-bold text-gray-900 text-2xl">TezDavo</span>
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">Вход</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Доставка лекарств · Toshkent
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">Вход для аптек</h1>
+          <p className="text-gray-500 text-sm mt-1">Кабинет партнёра</p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm">
@@ -68,7 +66,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="aptek@email.com"
                 autoComplete="email"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
               />
@@ -95,18 +93,28 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base disabled:opacity-50"
+              className="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold text-base disabled:opacity-50"
             >
-              {loading ? "Входим..." : "Войти"}
+              {loading ? "Входим..." : "Войти в кабинет аптеки"}
             </button>
           </form>
           <p className="text-center text-sm text-gray-500 mt-4">
             Нет аккаунта?{" "}
-            <Link href="/register" className="text-blue-600 font-medium">
-              Регистрация
+            <Link
+              href="/register-pharmacy"
+              className="text-green-600 font-medium"
+            >
+              Зарегистрировать аптеку
             </Link>
           </p>
         </div>
+
+        <p className="text-center text-xs text-gray-400 mt-4">
+          Покупатель?{" "}
+          <Link href="/login" className="text-blue-600">
+            Войти как покупатель
+          </Link>
+        </p>
       </div>
     </div>
   );
