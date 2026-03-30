@@ -1,0 +1,124 @@
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
+
+export default function RegisterPharmacyPage() {
+  const [form, setForm] = useState({
+    full_name: '', phone: '', email: '', password: '',
+    pharmacy_name: '', pharmacy_address: '', license_number: '',
+  })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({...p,[key]:e.target.value}))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setError(''); setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: existing } = await supabase.from('users').select('id').eq('phone', form.phone).maybeSingle()
+      if (existing) { setError('Этот номер телефона уже зарегистрирован'); setLoading(false); return }
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email, password: form.password,
+        options: { data: { full_name: form.full_name, phone: form.phone, role: 'pharmacy' } },
+      })
+      if (authError) { setError(authError.message.includes('already registered') ? 'Этот email уже зарегистрирован.' : authError.message); setLoading(false); return }
+      if (!authData.user) { setError('Ошибка регистрации'); setLoading(false); return }
+
+      // Создаём профиль пользователя
+      const { error: pErr } = await supabase.from('users').insert({ auth_id: authData.user.id, full_name: form.full_name, phone: form.phone, email: form.email, role: 'pharmacy' })
+      if (pErr) { await supabase.auth.signOut(); setError('Ошибка создания профиля: ' + pErr.message); setLoading(false); return }
+
+      // Получаем созданный профиль
+      const { data: userProfile } = await supabase.from('users').select('id').eq('auth_id', authData.user.id).single()
+      if (!userProfile) { setError('Ошибка получения профиля'); setLoading(false); return }
+
+      // Создаём запись аптеки (на модерации)
+      const { error: phErr } = await supabase.from('pharmacies').insert({
+        user_id: userProfile.id,
+        name: form.pharmacy_name,
+        address: form.pharmacy_address,
+        phone: form.phone,
+        license_number: form.license_number,
+        lat: 41.2995, lng: 69.2401, // дефолт Ташкент, потом уточним
+        is_verified: false,
+        is_active: false,
+      })
+      if (phErr) { setError('Ошибка регистрации аптеки: ' + phErr.message); setLoading(false); return }
+
+      window.location.href = '/pharmacy/dashboard'
+    } catch { setError('Неизвестная ошибка'); setLoading(false) }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center px-6 py-8">
+      <div className="max-w-md mx-auto w-full">
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 mb-4">
+            <span className="text-3xl">💊</span>
+            <span className="font-bold text-gray-900 text-2xl">TezDavo</span>
+          </Link>
+          <h1 className="text-xl font-bold text-gray-900">Регистрация аптеки</h1>
+          <p className="text-gray-500 text-sm mt-1">Подключите аптеку к платформе</p>
+        </div>
+
+        {/* Role switcher */}
+        <div className="bg-white rounded-2xl p-1.5 shadow-sm mb-6 flex gap-1">
+          <Link href="/register"          className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">👤 Покупатель</Link>
+          <span className="flex-1 text-center bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold">🏪 Аптека</span>
+          <Link href="/register-courier"  className="flex-1 text-center text-gray-500 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">🚴 Курьер</Link>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Данные владельца</p>
+            {[
+              { key:'full_name', label:'ФИО *',    placeholder:'Иван Иванов',       type:'text' },
+              { key:'phone',     label:'Телефон *', placeholder:'+998901234567',     type:'tel' },
+              { key:'email',     label:'Email *',   placeholder:'aptek@email.com',   type:'email' },
+              { key:'password',  label:'Пароль *',  placeholder:'Минимум 6 символов',type:'password' },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                <input required type={f.type} minLength={f.key==='password'?6:undefined}
+                  value={(form as any)[f.key]} onChange={set(f.key)} placeholder={f.placeholder}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"/>
+              </div>
+            ))}
+
+            <div className="border-t pt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Данные аптеки</p>
+              {[
+                { key:'pharmacy_name',    label:'Название аптеки *',  placeholder:'Аптека Хаёт' },
+                { key:'pharmacy_address', label:'Адрес аптеки *',     placeholder:'ул. Амира Темура 15, Ташкент' },
+                { key:'license_number',   label:'Номер лицензии *',   placeholder:'LIC-001-2024' },
+              ].map(f => (
+                <div key={f.key} className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                  <input required value={(form as any)[f.key]} onChange={set(f.key)} placeholder={f.placeholder}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"/>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-4 py-3 rounded-xl">
+              ⏳ После регистрации ваша аптека будет отправлена на верификацию. Обычно это занимает 1–2 рабочих дня.
+            </div>
+
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
+
+            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base disabled:opacity-50">
+              {loading ? 'Регистрируем аптеку...' : 'Зарегистрировать аптеку'}
+            </button>
+          </form>
+          <p className="text-center text-sm text-gray-500 mt-4">
+            Уже есть аккаунт? <Link href="/login" className="text-blue-600 font-medium">Войти</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

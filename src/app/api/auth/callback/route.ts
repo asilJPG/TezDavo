@@ -1,4 +1,3 @@
-// src/app/api/auth/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -21,7 +20,6 @@ export async function GET(request: NextRequest) {
         },
       }
     )
-
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)

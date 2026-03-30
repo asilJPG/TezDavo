@@ -1,21 +1,49 @@
--- PharmaUZ Database Schema
--- Supabase PostgreSQL
+-- ============================================================
+-- ШАГ 1: Удаляем всё старое
+-- ============================================================
 
--- Enable extensions
+DROP TABLE IF EXISTS ai_chat_history CASCADE;
+DROP TABLE IF EXISTS schedule_log CASCADE;
+DROP TABLE IF EXISTS medication_schedule CASCADE;
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS couriers CASCADE;
+DROP TABLE IF EXISTS pharmacy_inventory CASCADE;
+DROP TABLE IF EXISTS medicines CASCADE;
+DROP TABLE IF EXISTS pharmacies CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP TYPE IF EXISTS user_role CASCADE;
+DROP TYPE IF EXISTS order_status CASCADE;
+DROP TYPE IF EXISTS dosage_form CASCADE;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+-- ============================================================
+-- ШАГ 2: Расширения
+-- ============================================================
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ============================================
--- USERS
--- ============================================
+-- ============================================================
+-- ШАГ 3: Типы
+-- ============================================================
+
 CREATE TYPE user_role AS ENUM ('user', 'pharmacy', 'courier', 'admin');
+CREATE TYPE order_status AS ENUM ('created', 'pharmacy_confirmed', 'courier_assigned', 'picked_up', 'delivered', 'cancelled');
+CREATE TYPE dosage_form AS ENUM ('tablet', 'capsule', 'syrup', 'injection', 'cream', 'drops', 'spray', 'other');
+
+-- ============================================================
+-- ШАГ 4: Таблицы
+-- ============================================================
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   auth_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name TEXT NOT NULL,
-  phone TEXT UNIQUE NOT NULL,
-  email TEXT UNIQUE,
+  full_name TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT,
   role user_role NOT NULL DEFAULT 'user',
   address TEXT,
   lat DOUBLE PRECISION,
@@ -25,18 +53,15 @@ CREATE TABLE users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================
--- PHARMACIES
--- ============================================
 CREATE TABLE pharmacies (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   address TEXT NOT NULL,
-  lat DOUBLE PRECISION NOT NULL,
-  lng DOUBLE PRECISION NOT NULL,
-  phone TEXT NOT NULL,
+  lat DOUBLE PRECISION NOT NULL DEFAULT 0,
+  lng DOUBLE PRECISION NOT NULL DEFAULT 0,
+  phone TEXT NOT NULL DEFAULT '',
   license_number TEXT UNIQUE NOT NULL,
   working_hours JSONB DEFAULT '{"mon_fri": "08:00-22:00", "sat_sun": "09:00-20:00"}',
   logo_url TEXT,
@@ -46,11 +71,6 @@ CREATE TABLE pharmacies (
   review_count INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- ============================================
--- MEDICINES
--- ============================================
-CREATE TYPE dosage_form AS ENUM ('tablet', 'capsule', 'syrup', 'injection', 'cream', 'drops', 'spray', 'other');
 
 CREATE TABLE medicines (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -69,35 +89,14 @@ CREATE TABLE medicines (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_medicines_name ON medicines USING gin(to_tsvector('russian', name || ' ' || COALESCE(generic_name, '')));
-
--- ============================================
--- PHARMACY INVENTORY
--- ============================================
 CREATE TABLE pharmacy_inventory (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   pharmacy_id UUID REFERENCES pharmacies(id) ON DELETE CASCADE,
   medicine_id UUID REFERENCES medicines(id) ON DELETE CASCADE,
   quantity INT NOT NULL DEFAULT 0,
   price DECIMAL(10,2) NOT NULL,
-  in_stock BOOLEAN GENERATED ALWAYS AS (quantity > 0) STORED,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(pharmacy_id, medicine_id)
-);
-
-CREATE INDEX idx_inventory_medicine ON pharmacy_inventory(medicine_id);
-CREATE INDEX idx_inventory_pharmacy ON pharmacy_inventory(pharmacy_id);
-
--- ============================================
--- ORDERS
--- ============================================
-CREATE TYPE order_status AS ENUM (
-  'created',
-  'pharmacy_confirmed',
-  'courier_assigned',
-  'picked_up',
-  'delivered',
-  'cancelled'
 );
 
 CREATE TABLE orders (
@@ -107,10 +106,10 @@ CREATE TABLE orders (
   pharmacy_id UUID REFERENCES pharmacies(id),
   courier_id UUID REFERENCES users(id),
   status order_status NOT NULL DEFAULT 'created',
-  subtotal DECIMAL(10,2) NOT NULL,
+  subtotal DECIMAL(10,2) NOT NULL DEFAULT 0,
   delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 15000,
-  total_amount DECIMAL(10,2) NOT NULL,
-  delivery_address TEXT NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  delivery_address TEXT NOT NULL DEFAULT '',
   delivery_lat DOUBLE PRECISION,
   delivery_lng DOUBLE PRECISION,
   notes TEXT,
@@ -122,14 +121,6 @@ CREATE TABLE orders (
   delivered_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_orders_pharmacy ON orders(pharmacy_id);
-CREATE INDEX idx_orders_courier ON orders(courier_id);
-CREATE INDEX idx_orders_status ON orders(status);
-
--- ============================================
--- ORDER ITEMS
--- ============================================
 CREATE TABLE order_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
@@ -137,13 +128,9 @@ CREATE TABLE order_items (
   medicine_id UUID REFERENCES medicines(id),
   medicine_name TEXT NOT NULL,
   quantity INT NOT NULL,
-  unit_price DECIMAL(10,2) NOT NULL,
-  total_price DECIMAL(10,2) GENERATED ALWAYS AS (quantity * unit_price) STORED
+  unit_price DECIMAL(10,2) NOT NULL
 );
 
--- ============================================
--- COURIERS
--- ============================================
 CREATE TABLE couriers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -158,9 +145,6 @@ CREATE TABLE couriers (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================
--- MEDICATION SCHEDULE
--- ============================================
 CREATE TABLE medication_schedule (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -175,11 +159,6 @@ CREATE TABLE medication_schedule (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_schedule_user ON medication_schedule(user_id);
-
--- ============================================
--- SCHEDULE LOG (taken / skipped tracking)
--- ============================================
 CREATE TABLE schedule_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   schedule_id UUID REFERENCES medication_schedule(id) ON DELETE CASCADE,
@@ -190,9 +169,6 @@ CREATE TABLE schedule_log (
   date DATE NOT NULL
 );
 
--- ============================================
--- AI CHAT HISTORY
--- ============================================
 CREATE TABLE ai_chat_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -201,9 +177,34 @@ CREATE TABLE ai_chat_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================
--- RLS POLICIES
--- ============================================
+-- ============================================================
+-- ШАГ 5: Триггер — автоматически создаёт профиль при регистрации
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (auth_id, full_name, phone, email, role)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'role', 'user')::user_role
+  )
+  ON CONFLICT (auth_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ============================================================
+-- ШАГ 6: RLS
+-- ============================================================
+
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pharmacies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medicines ENABLE ROW LEVEL SECURITY;
@@ -215,33 +216,41 @@ ALTER TABLE medication_schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_chat_history ENABLE ROW LEVEL SECURITY;
 
--- Users: can read/update own profile
-CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = auth_id);
-CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = auth_id);
+-- users
+CREATE POLICY "users_select" ON users FOR SELECT USING (auth.uid() = auth_id);
+CREATE POLICY "users_update" ON users FOR UPDATE USING (auth.uid() = auth_id);
 
--- Medicines: everyone can read
-CREATE POLICY "Medicines are public" ON medicines FOR SELECT TO PUBLIC USING (true);
+-- medicines — публичные для всех
+CREATE POLICY "medicines_select" ON medicines FOR SELECT USING (true);
 
--- Inventory: everyone can read, pharmacies can manage their own
-CREATE POLICY "Inventory is public" ON pharmacy_inventory FOR SELECT TO PUBLIC USING (true);
+-- pharmacies — публичные для всех
+CREATE POLICY "pharmacies_select" ON pharmacies FOR SELECT USING (true);
 
--- Orders: users see own, pharmacies see theirs, couriers see assigned
-CREATE POLICY "Users see own orders" ON orders FOR SELECT
+-- inventory — публичные для всех
+CREATE POLICY "inventory_select" ON pharmacy_inventory FOR SELECT USING (true);
+
+-- orders
+CREATE POLICY "orders_select" ON orders FOR SELECT
   USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
-CREATE POLICY "Users create orders" ON orders FOR INSERT
+CREATE POLICY "orders_insert" ON orders FOR INSERT
   WITH CHECK (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
--- Schedule: users manage own
-CREATE POLICY "Users manage own schedule" ON medication_schedule
+-- schedule
+CREATE POLICY "schedule_all" ON medication_schedule
   FOR ALL USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
--- AI chat: users manage own
-CREATE POLICY "Users manage own chat" ON ai_chat_history
+-- schedule_log
+CREATE POLICY "schedule_log_all" ON schedule_log
   FOR ALL USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
 
--- ============================================
--- SEED DATA — Categories & Sample Medicines
--- ============================================
+-- ai chat
+CREATE POLICY "chat_all" ON ai_chat_history
+  FOR ALL USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- ============================================================
+-- ШАГ 7: Seed — тестовые лекарства
+-- ============================================================
+
 INSERT INTO medicines (name, generic_name, manufacturer, category, dosage_form, dosage_strength, requires_prescription, description) VALUES
 ('Парацетамол', 'Paracetamol', 'Фармасинтез', 'Обезболивающие', 'tablet', '500mg', false, 'Жаропонижающее и обезболивающее средство'),
 ('Ибупрофен', 'Ibuprofen', 'Renewal', 'Обезболивающие', 'tablet', '400mg', false, 'Нестероидное противовоспалительное'),
@@ -249,4 +258,7 @@ INSERT INTO medicines (name, generic_name, manufacturer, category, dosage_form, 
 ('Омепразол', 'Omeprazole', 'Акрихин', 'Желудочно-кишечные', 'capsule', '20mg', false, 'Ингибитор протонной помпы'),
 ('Лоратадин', 'Loratadine', 'Оболенское', 'Антигистаминные', 'tablet', '10mg', false, 'Антигистаминное средство'),
 ('Витамин С', 'Ascorbic acid', 'Марбиофарм', 'Витамины', 'tablet', '500mg', false, 'Аскорбиновая кислота, антиоксидант'),
-('Но-Шпа', 'Drotaverine', 'Хинон', 'Спазмолитики', 'tablet', '40mg', false, 'Спазмолитическое средство');
+('Но-Шпа', 'Drotaverine', 'Хинон', 'Спазмолитики', 'tablet', '40mg', false, 'Спазмолитическое средство'),
+('Цетиризин', 'Cetirizine', 'Renewal', 'Антигистаминные', 'tablet', '10mg', false, 'Антиаллергическое средство'),
+('Метформин', 'Metformin', 'Акрихин', 'Диабет', 'tablet', '500mg', true, 'Препарат для лечения диабета 2 типа'),
+('Эналаприл', 'Enalapril', 'Синтез', 'Сердечные', 'tablet', '10mg', true, 'Ингибитор АПФ, снижает давление');

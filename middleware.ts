@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -25,26 +24,44 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
+  // Обновляем сессию (это важно для SSR)
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
   const path = request.nextUrl.pathname
 
-  // Защищённые роуты — требуют авторизации
-  const protectedRoutes = ['/profile', '/cart', '/checkout', '/order', '/ai-chat', '/pharmacy/dashboard', '/courier/dashboard', '/admin']
-  const isProtected = protectedRoutes.some(r => path.startsWith(r))
+  // Роуты требующие авторизации
+  const protectedPrefixes = [
+    '/profile',
+    '/cart',
+    '/checkout',
+    '/order',
+    '/ai-chat',
+    '/pharmacy/dashboard',
+    '/pharmacy/inventory',
+    '/courier/dashboard',
+    '/admin',
+  ]
+  const isProtected = protectedPrefixes.some(p => path.startsWith(p))
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
-  // Авторизованным не нужна страница логина
-  if (user && (path === '/login' || path === '/register')) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // Авторизованным не нужны страницы входа/регистрации
+  const authOnlyPages = ['/login', '/register', '/register-pharmacy', '/register-courier']
+  if (user && authOnlyPages.includes(path)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|ico|webp)).*)',
+  ],
 }
