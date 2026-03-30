@@ -1,0 +1,64 @@
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+/* Убираем скроллбар где не нужен */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area для iPhone */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 text-white font-semibold rounded-xl px-5 py-3 text-sm active:scale-95 transition-transform disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply bg-white text-gray-700 font-medium rounded-xl px-5 py-3 text-sm border border-gray-200 active:scale-95 transition-transform;
+  }
+  .card {
+    @apply bg-white rounded-2xl shadow-sm p-4;
+  }
+  .input {
+    @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
