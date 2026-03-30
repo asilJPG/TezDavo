@@ -1,27 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
+// src/app/api/pharmacies/my/route.ts
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 
-export async function GET(req: NextRequest) {
-  const supabase = createClient()
-  const { searchParams } = new URL(req.url)
-  const lat = parseFloat(searchParams.get('lat') || '0')
-  const lng = parseFloat(searchParams.get('lng') || '0')
+export async function GET() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from('pharmacies')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_verified', true)
-    .order('rating', { ascending: false })
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("auth_id", user.id)
+    .single();
+  if (!dbUser)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const { data: pharmacy } = await supabase
+    .from("pharmacies")
+    .select("*")
+    .eq("user_id", dbUser.id)
+    .single();
 
-  let pharmacies = data || []
-  if (lat && lng) {
-    pharmacies = pharmacies
-      .map(p => ({ ...p, distance: Math.sqrt((p.lat - lat) ** 2 + (p.lng - lng) ** 2) * 111 }))
-      .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
-  }
-
-  return NextResponse.json({ pharmacies })
+  return NextResponse.json({ pharmacy });
 }

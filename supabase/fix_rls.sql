@@ -48,3 +48,6 @@ CREATE POLICY "Inventory is public" ON pharmacy_inventory
 DROP POLICY IF EXISTS "Pharmacies are public" ON pharmacies;
 CREATE POLICY "Pharmacies are public" ON pharmacies
   FOR SELECT USING (true);
+
+
+  
