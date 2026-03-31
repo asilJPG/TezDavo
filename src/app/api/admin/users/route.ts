@@ -5,7 +5,13 @@ import { createClient } from "@supabase/supabase-js";
 export async function GET() {
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      global: {
+        fetch: (url: RequestInfo | URL, options?: RequestInit) =>
+          fetch(url, { ...options, cache: "no-store" }),
+      },
+    }
   );
   const { data: users, error } = await supabaseAdmin
     .from("users")
