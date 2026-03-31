@@ -1,7 +1,10 @@
 // src/app/api/admin/pharmacies/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-//единственный рабочий варинат поменял миллион раз
+
+// Отключаем кеш Next.js — всегда свежие данные
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
