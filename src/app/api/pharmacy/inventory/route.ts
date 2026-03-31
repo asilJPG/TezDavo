@@ -3,10 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 
-const supabaseAdmin = createAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = "force-dynamic";
+
+const NO_STORE = {
+  global: {
+    fetch: (url: RequestInfo | URL, options?: RequestInit) =>
+      fetch(url, { ...options, cache: "no-store" }),
+  },
+};
 
 async function getPharmacyId(supabase: any) {
   const {
@@ -27,12 +31,17 @@ async function getPharmacyId(supabase: any) {
   return pharmacy?.id || null;
 }
 
-// GET — список товаров на складе
 export async function GET() {
   const supabase = createClient();
   const pharmacyId = await getPharmacyId(supabase);
   if (!pharmacyId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const supabaseAdmin = createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    NO_STORE
+  );
 
   const { data: items, error } = await supabaseAdmin
     .from("pharmacy_inventory")
@@ -47,7 +56,6 @@ export async function GET() {
   return NextResponse.json({ items });
 }
 
-// POST — добавить лекарство на склад
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const pharmacyId = await getPharmacyId(supabase);
@@ -61,6 +69,12 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const supabaseAdmin = createAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    NO_STORE
+  );
 
   const { error } = await supabaseAdmin.from("pharmacy_inventory").upsert(
     {
