@@ -1,5 +1,4 @@
 "use client";
-// src/app/admin/pharmacies/page.tsx
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -30,7 +29,6 @@ export default function AdminPharmaciesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      // const res = await fetch("/api/admin/pharmacies");
       const res = await fetch("/api/admin/pharmacies", { cache: "no-store" });
       const data = await res.json();
       setPharmacies(data.pharmacies || []);
@@ -42,12 +40,19 @@ export default function AdminPharmaciesPage() {
   const verify = async (id: string, verified: boolean, active: boolean) => {
     setActionLoading(id);
     try {
-      await fetch(`/api/admin/pharmacies/${id}`, {
+      const res = await fetch(`/api/admin/pharmacies/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_verified: verified, is_active: active }),
       });
-      await load();
+      if (res.ok) {
+        // Обновляем локально — не делаем повторный запрос к API
+        setPharmacies((prev) =>
+          prev.map((p) =>
+            p.id === id ? { ...p, is_verified: verified, is_active: active } : p
+          )
+        );
+      }
     } finally {
       setActionLoading(null);
     }
@@ -71,7 +76,6 @@ export default function AdminPharmaciesPage() {
           </span>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-4">
           {[
             { k: "pending", l: "На модерации", c: pending.length },
@@ -123,7 +127,6 @@ export default function AdminPharmaciesPage() {
               key={pharmacy.id}
               className="bg-white rounded-xl p-4 shadow-sm"
             >
-              {/* Header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -155,7 +158,6 @@ export default function AdminPharmaciesPage() {
                 </div>
               </div>
 
-              {/* Details */}
               <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                 <div className="bg-gray-50 rounded-lg px-3 py-2">
                   <span className="text-gray-400">Лицензия</span>
@@ -197,7 +199,6 @@ export default function AdminPharmaciesPage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
                 {!pharmacy.is_verified ? (
                   <>
