@@ -1,29 +1,21 @@
-// src/app/api/pharmacy/inventory/[id]/route.ts
+// src/app/api/admin/pharmacies/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAdmin } from "@supabase/supabase-js";
-
-export const dynamic = "force-dynamic";
+import { createClient } from "@supabase/supabase-js";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabaseAdmin = createAdmin(
+  const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      global: {
-        fetch: (url: RequestInfo | URL, options?: RequestInit) =>
-          fetch(url, { ...options, cache: "no-store" }),
-      },
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { price, quantity } = await req.json();
+  const { is_verified, is_active } = await req.json();
 
   const { error } = await supabaseAdmin
-    .from("pharmacy_inventory")
-    .update({ price: Number(price), quantity: Number(quantity) })
+    .from("pharmacies")
+    .update({ is_verified, is_active })
     .eq("id", params.id);
 
   if (error)
