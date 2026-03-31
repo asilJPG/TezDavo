@@ -1,13 +1,11 @@
 "use client";
-// src/components/layout/BottomNav.tsx
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/hooks/useCart";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+const MOBILE_NAV = [
   { href: "/", icon: "🏠", label: "Главная" },
-  { href: "/search", icon: "🔍", label: "Поиск" },
   { href: "/cart", icon: "🛒", label: "Корзина", badge: true },
   { href: "/ai-chat", icon: "🤖", label: "AI Чат" },
   { href: "/profile", icon: "👤", label: "Профиль" },
@@ -18,9 +16,9 @@ export function BottomNav() {
   const { count } = useCart();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t z-50 pb-safe">
-      <div className="max-w-md mx-auto grid grid-cols-5">
-        {NAV_ITEMS.map((item) => {
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t z-50 pb-safe lg:hidden">
+      <div className="grid grid-cols-4">
+        {MOBILE_NAV.map((item) => {
           const active =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));
@@ -35,7 +33,7 @@ export function BottomNav() {
             >
               <span className="text-xl">{item.icon}</span>
               {item.badge && count > 0 && (
-                <span className="absolute top-1 right-3 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute top-1 right-4 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                   {count > 9 ? "9+" : count}
                 </span>
               )}

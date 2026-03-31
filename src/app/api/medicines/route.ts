@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { createClient as createAdmin } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdmin(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(req: NextRequest) {
   const supabase = createClient();
@@ -26,10 +32,7 @@ export async function GET(req: NextRequest) {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Берём минимальную цену — фильтруем по quantity > 0 вместо in_stock
-  // (in_stock — GENERATED колонка, иногда даёт 500 через PostgREST)
   const medicineIds = (medicines || []).map((m) => m.id);
-
   let prices: any[] = [];
   if (medicineIds.length > 0) {
     const { data } = await supabase
@@ -58,4 +61,31 @@ export async function GET(req: NextRequest) {
     page,
     limit,
   });
+}
+
+// POST — создать новое лекарство (аптека добавляет то чего нет в базе)
+export async function POST(req: NextRequest) {
+  const { name, category, dosage_strength, dosage_form } = await req.json();
+
+  if (!name || !category) {
+    return NextResponse.json(
+      { error: "Название и категория обязательны" },
+      { status: 400 }
+    );
+  }
+
+  const { data: medicine, error } = await supabaseAdmin
+    .from("medicines")
+    .insert({
+      name,
+      category,
+      dosage_strength: dosage_strength || null,
+      dosage_form: dosage_form || "other",
+    })
+    .select()
+    .single();
+
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ medicine }, { status: 201 });
 }

@@ -30,7 +30,8 @@ export default function AdminPharmaciesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/pharmacies");
+      // const res = await fetch("/api/admin/pharmacies");
+      const res = await fetch("/api/admin/pharmacies", { cache: "no-store" });
       const data = await res.json();
       setPharmacies(data.pharmacies || []);
     } finally {
