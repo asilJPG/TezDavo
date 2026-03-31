@@ -3,15 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
 
-export const dynamic = "force-dynamic";
-
-const NO_STORE = {
-  global: {
-    fetch: (url: RequestInfo | URL, options?: RequestInit) =>
-      fetch(url, { ...options, cache: "no-store" }),
-  },
-};
-
 async function getPharmacyId(supabase: any) {
   const {
     data: { user },
@@ -39,8 +30,7 @@ export async function GET() {
 
   const supabaseAdmin = createAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    NO_STORE
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   const { data: items, error } = await supabaseAdmin
@@ -72,8 +62,7 @@ export async function POST(req: NextRequest) {
 
   const supabaseAdmin = createAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    NO_STORE
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   const { error } = await supabaseAdmin.from("pharmacy_inventory").upsert(
