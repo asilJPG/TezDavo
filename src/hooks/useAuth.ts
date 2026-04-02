@@ -5,25 +5,50 @@ import { createClient } from "@/lib/supabase";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { User } from "@/types";
 
+const CACHE_KEY = "tezdavo_user";
+
+function getCachedUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedUser(user: User | null) {
+  if (typeof window === "undefined") return;
+  if (user) localStorage.setItem(CACHE_KEY, JSON.stringify(user));
+  else localStorage.removeItem(CACHE_KEY);
+}
+
 interface AuthState {
   supabaseUser: SupabaseUser | null;
   user: User | null;
   loading: boolean;
 }
 
-// Client-side кеш — живёт пока открыта вкладка
-// Это безопасно: код выполняется только в браузере конкретного пользователя
 let _cachedUser: User | null = null;
-let _cacheReady = false;
+let _fetchPromise: Promise<void> | null = null;
 
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({
     supabaseUser: null,
     user: _cachedUser,
-    loading: !_cacheReady,
+    loading: !_cachedUser,
   });
 
   useEffect(() => {
+    // Читаем localStorage только на клиенте
+    if (!_cachedUser) {
+      const fromStorage = getCachedUser();
+      if (fromStorage) {
+        _cachedUser = fromStorage;
+        setState((prev) => ({ ...prev, user: fromStorage, loading: false }));
+      }
+    }
+
     const supabase = createClient();
     let mounted = true;
 
@@ -32,46 +57,46 @@ export function useAuth(): AuthState {
 
       if (!supabaseUser) {
         _cachedUser = null;
-        _cacheReady = true;
+        _fetchPromise = null;
+        setCachedUser(null);
         setState({ supabaseUser: null, user: null, loading: false });
         return;
       }
 
-      // Есть кеш для этого юзера — не делаем повторный запрос
-      if (_cacheReady && _cachedUser) {
+      if (_cachedUser) {
         setState({ supabaseUser, user: _cachedUser, loading: false });
         return;
       }
 
-      const { data: user } = await supabase
-        .from("users")
-        .select("*")
-        .eq("auth_id", supabaseUser.id)
-        .single();
+      // Предотвращаем дублирующие запросы
+      if (!_fetchPromise) {
+        _fetchPromise = supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", supabaseUser.id)
+          .single()
+          .then(({ data: user }) => {
+            _cachedUser = user;
+            setCachedUser(user);
+            _fetchPromise = null;
+            if (mounted) setState({ supabaseUser, user, loading: false });
+          });
+      }
 
-      if (!mounted) return;
-
-      _cachedUser = user;
-      _cacheReady = true;
-      setState({ supabaseUser, user, loading: false });
+      await _fetchPromise;
     };
 
-    supabase.auth.getUser().then(({ data }) => fetchUser(data.user));
-
+    // Используем только onAuthStateChange — не вызываем getUser() отдельно
+    // чтобы избежать lock race condition
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         _cachedUser = null;
-        _cacheReady = false;
+        _fetchPromise = null;
+        setCachedUser(null);
       }
-      if (
-        event === "SIGNED_IN" ||
-        event === "SIGNED_OUT" ||
-        event === "TOKEN_REFRESHED"
-      ) {
-        fetchUser(session?.user ?? null);
-      }
+      fetchUser(session?.user ?? null);
     });
 
     return () => {
@@ -85,7 +110,8 @@ export function useAuth(): AuthState {
 
 export async function signOut() {
   _cachedUser = null;
-  _cacheReady = false;
+  _fetchPromise = null;
+  setCachedUser(null);
   const supabase = createClient();
   await supabase.auth.signOut();
   window.location.href = "/login";

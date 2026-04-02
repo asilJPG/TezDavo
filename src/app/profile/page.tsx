@@ -9,8 +9,8 @@ const MENU = [
   {
     href: "/profile/orders",
     icon: "📦",
-    label: "История заказов",
-    desc: "Все ваши заказы",
+    label: "Мои заказы",
+    desc: "Активные и история",
   },
   {
     href: "/profile/medicines",
@@ -83,7 +83,6 @@ function LoginForm() {
           Чтобы видеть профиль и заказы
         </p>
       </div>
-
       <div className="bg-white rounded-2xl p-6 shadow-sm mb-4">
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -96,7 +95,7 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400"
             />
           </div>
           <div>
@@ -109,7 +108,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400"
             />
           </div>
           {error && (
@@ -120,7 +119,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-base disabled:opacity-50"
+            className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold disabled:opacity-50"
           >
             {loading ? "Входим..." : "Войти"}
           </button>
@@ -138,6 +137,29 @@ function LoginForm() {
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ full_name: "", phone: "" });
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = () => {
+    setForm({ full_name: user?.full_name || "", phone: user?.phone || "" });
+    setEditing(true);
+  };
+
+  const saveProfile = async () => {
+    setSaving(true);
+    try {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      setEditing(false);
+      window.location.reload();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -152,52 +174,96 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-14 bg-gray-100 rounded-xl animate-pulse"
-            />
-          ))}
         </div>
       </AppLayout>
     );
   }
 
-  if (!user) {
+  if (!user)
     return (
       <AppLayout>
         <LoginForm />
       </AppLayout>
     );
-  }
 
   return (
     <AppLayout>
       <div className="max-w-xl mx-auto px-4 py-6">
+        {/* User card */}
         <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-2xl font-bold text-blue-700 flex-shrink-0">
-              {user.full_name.slice(0, 1).toUpperCase()}
+          {!editing ? (
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-2xl font-bold text-blue-700 flex-shrink-0">
+                {user.full_name.slice(0, 1).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900 text-lg">
+                  {user.full_name}
+                </p>
+                <p className="text-gray-500 text-sm">{user.phone}</p>
+                {user.email && (
+                  <p className="text-gray-400 text-xs">{user.email}</p>
+                )}
+                <span className="inline-flex mt-1.5 bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                  {ROLE_LABELS[user.role] ?? user.role}
+                </span>
+              </div>
+              <button
+                onClick={startEdit}
+                className="text-blue-600 text-sm font-medium flex-shrink-0"
+              >
+                Изменить
+              </button>
             </div>
-            <div>
-              <p className="font-bold text-gray-900 text-lg">
-                {user.full_name}
-              </p>
-              <p className="text-gray-500 text-sm">{user.phone}</p>
-              {user.email && (
-                <p className="text-gray-400 text-xs">{user.email}</p>
-              )}
-              <span className="inline-flex mt-1.5 bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-medium">
-                {ROLE_LABELS[user.role] ?? user.role}
-              </span>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Полное имя
+                </label>
+                <input
+                  value={form.full_name}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, full_name: e.target.value }))
+                  }
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Телефон
+                </label>
+                <input
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, phone: e.target.value }))
+                  }
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex-1 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={saveProfile}
+                  disabled={saving}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  {saving ? "..." : "Сохранить"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {user.role === "pharmacy" && (
           <Link
             href="/pharmacy/dashboard"
-            className="flex items-center gap-3 bg-blue-600 text-white p-4 rounded-xl mb-4 hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-3 bg-blue-600 text-white p-4 rounded-xl mb-4"
           >
             <span className="text-2xl">🏪</span>
             <div>
@@ -210,14 +276,12 @@ export default function ProfilePage() {
         {user.role === "courier" && (
           <Link
             href="/courier/dashboard"
-            className="flex items-center gap-3 bg-green-600 text-white p-4 rounded-xl mb-4 hover:bg-green-700 transition-colors"
+            className="flex items-center gap-3 bg-green-600 text-white p-4 rounded-xl mb-4"
           >
             <span className="text-2xl">🚴</span>
             <div>
               <p className="font-semibold">Кабинет курьера</p>
-              <p className="text-green-200 text-xs">
-                Доступные заказы и маршруты
-              </p>
+              <p className="text-green-200 text-xs">Доступные заказы</p>
             </div>
             <span className="ml-auto text-xl">→</span>
           </Link>
@@ -225,7 +289,7 @@ export default function ProfilePage() {
         {user.role === "admin" && (
           <Link
             href="/admin"
-            className="flex items-center gap-3 bg-purple-600 text-white p-4 rounded-xl mb-4 hover:bg-purple-700 transition-colors"
+            className="flex items-center gap-3 bg-purple-600 text-white p-4 rounded-xl mb-4"
           >
             <span className="text-2xl">⚙️</span>
             <div>
@@ -241,9 +305,7 @@ export default function ProfilePage() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 transition-colors ${
-                i < arr.length - 1 ? "border-b border-gray-100" : ""
-              }`}
+              className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 transition-colors ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}
             >
               <span className="text-xl w-8 text-center">{item.icon}</span>
               <div className="flex-1">
@@ -259,7 +321,7 @@ export default function ProfilePage() {
 
         <button
           onClick={signOut}
-          className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl font-medium text-sm hover:bg-red-50 transition-colors"
+          className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl font-medium text-sm hover:bg-red-50"
         >
           Выйти из аккаунта
         </button>

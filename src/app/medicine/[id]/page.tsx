@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useCart } from "@/hooks/useCart";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import { formatPrice } from "@/lib/utils";
 
 interface Pharmacy {
@@ -13,6 +14,8 @@ interface Pharmacy {
   phone: string;
   rating: number;
   is_verified: boolean;
+  lat: number;
+  lng: number;
   working_hours: { mon_fri: string; sat_sun: string };
 }
 interface PriceRow {
@@ -36,13 +39,37 @@ interface Medicine {
   requires_prescription: boolean;
 }
 
+function getDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)} м` : `${km.toFixed(1)} км`;
+}
+
 export default function MedicinePage() {
   const { id } = useParams<{ id: string }>();
   const { addItem, pharmacyId } = useCart();
+  const { location, refetch: getLocation } = useGeolocation();
   const [medicine, setMedicine] = useState<Medicine | null>(null);
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"prices" | "info">("prices");
+  const [sortBy, setSortBy] = useState<"price" | "distance">("price");
   const [addedId, setAddedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +100,34 @@ export default function MedicinePage() {
     setTimeout(() => setAddedId(null), 2000);
   };
 
+  const handleSortByDistance = () => {
+    setSortBy("distance");
+    if (!location) getLocation();
+  };
+
+  const sortedPrices = useMemo(() => {
+    if (sortBy === "price")
+      return [...prices].sort((a, b) => a.price - b.price);
+    if (sortBy === "distance" && location) {
+      return [...prices].sort((a, b) => {
+        const distA = getDistance(
+          location.lat,
+          location.lng,
+          a.pharmacy.lat,
+          a.pharmacy.lng,
+        );
+        const distB = getDistance(
+          location.lat,
+          location.lng,
+          b.pharmacy.lat,
+          b.pharmacy.lng,
+        );
+        return distA - distB;
+      });
+    }
+    return prices;
+  }, [prices, sortBy, location]);
+
   if (loading)
     return (
       <AppLayout>
@@ -102,7 +157,6 @@ export default function MedicinePage() {
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Back + title */}
         <div className="flex items-center gap-3 mb-6">
           <Link href="/search" className="text-gray-500 text-xl">
             ←
@@ -112,7 +166,6 @@ export default function MedicinePage() {
           </h1>
         </div>
 
-        {/* Medicine card */}
         <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
           <div className="flex gap-4 items-start">
             <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -158,90 +211,127 @@ export default function MedicinePage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-4">
           {(["prices", "info"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                tab === t
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-600 shadow-sm"
-              }`}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${tab === t ? "bg-blue-600 text-white" : "bg-white text-gray-600 shadow-sm"}`}
             >
               {t === "prices" ? `Цены (${prices.length})` : "Инструкция"}
             </button>
           ))}
         </div>
 
-        {/* Prices */}
         {tab === "prices" && (
-          <div className="space-y-3">
-            {prices.length === 0 && (
-              <div className="text-center py-16 bg-white rounded-2xl">
-                <div className="text-4xl mb-2">🏪</div>
-                <p className="text-gray-500">Нет в наличии</p>
+          <div>
+            {prices.length > 1 && (
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setSortBy("price")}
+                  className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${sortBy === "price" ? "bg-gray-900 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
+                >
+                  💰 По цене
+                </button>
+                <button
+                  onClick={handleSortByDistance}
+                  className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${sortBy === "distance" ? "bg-gray-900 text-white" : "bg-white text-gray-600 border border-gray-200"}`}
+                >
+                  📍 По близости
+                </button>
               </div>
             )}
-            {prices.map((row, i) => (
-              <div key={row.id} className="bg-white rounded-xl p-4 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900 text-sm">
-                        {row.pharmacy.name}
-                      </span>
-                      {row.pharmacy.is_verified && (
-                        <span className="text-blue-500 text-xs">✓</span>
-                      )}
-                      {i === 0 && (
-                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
-                          Лучшая цена
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      📍 {row.pharmacy.address}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      ⏰ {row.pharmacy.working_hours?.mon_fri}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      В наличии: {row.quantity} шт.
-                    </p>
-                  </div>
-                  <div className="text-right ml-4">
-                    <div className="font-bold text-blue-600 text-xl">
-                      {row.price.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-gray-400">сум</div>
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <Link
-                    href={`/pharmacy/${row.pharmacy.id}`}
-                    className="flex-1 text-center py-2 border border-gray-200 rounded-xl text-sm text-gray-600"
-                  >
-                    Аптека
-                  </Link>
-                  <button
-                    onClick={() => handleAdd(row)}
-                    className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                      addedId === row.id
-                        ? "bg-green-500 text-white"
-                        : "bg-blue-600 text-white"
-                    }`}
-                  >
-                    {addedId === row.id ? "✓ Добавлено" : "В корзину"}
-                  </button>
-                </div>
+
+            {sortBy === "distance" && !location && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-700">
+                Определяем ваше местоположение...
               </div>
-            ))}
+            )}
+
+            <div className="space-y-3">
+              {prices.length === 0 && (
+                <div className="text-center py-16 bg-white rounded-2xl">
+                  <div className="text-4xl mb-2">🏪</div>
+                  <p className="text-gray-500">Нет в наличии</p>
+                </div>
+              )}
+              {sortedPrices.map((row, i) => {
+                const dist = location
+                  ? getDistance(
+                      location.lat,
+                      location.lng,
+                      row.pharmacy.lat,
+                      row.pharmacy.lng,
+                    )
+                  : null;
+                return (
+                  <div
+                    key={row.id}
+                    className="bg-white rounded-xl p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {row.pharmacy.name}
+                          </span>
+                          {row.pharmacy.is_verified && (
+                            <span className="text-blue-500 text-xs">✓</span>
+                          )}
+                          {sortBy === "price" && i === 0 && (
+                            <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
+                              Лучшая цена
+                            </span>
+                          )}
+                          {sortBy === "distance" && i === 0 && (
+                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                              Ближайшая
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          📍 {row.pharmacy.address}
+                        </p>
+                        {dist !== null && (
+                          <p className="text-xs text-blue-600 font-medium">
+                            🚶 {formatDistance(dist)}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400">
+                          ⏰ {row.pharmacy.working_hours?.mon_fri}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          В наличии: {row.quantity} шт.
+                        </p>
+                      </div>
+                      <div className="text-right ml-4">
+                        <div className="font-bold text-blue-600 text-xl">
+                          {row.price.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-gray-400">сум</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Link
+                        href={`/pharmacy/${row.pharmacy.id}`}
+                        className="flex-1 text-center py-2 border border-gray-200 rounded-xl text-sm text-gray-600"
+                      >
+                        Аптека
+                      </Link>
+                      <button
+                        onClick={() => handleAdd(row)}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${addedId === row.id ? "bg-green-500 text-white" : "bg-blue-600 text-white"}`}
+                      >
+                        {addedId === row.id ? "✓ Добавлено" : "В корзину"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Info */}
         {tab === "info" && (
           <div className="space-y-3">
             {[

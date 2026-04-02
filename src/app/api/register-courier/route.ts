@@ -1,4 +1,4 @@
-// src/app/api/auth/register/route.ts
+// src/app/api/register-courier/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -6,39 +6,57 @@ export async function POST(req: NextRequest) {
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      global: {
-        fetch: (url: RequestInfo | URL, options?: RequestInit) =>
-          fetch(url, { ...options, cache: "no-store" }),
-      },
-    }
   );
+
   try {
-    const { auth_id, full_name, phone, email, role } = await req.json();
+    const { auth_id, full_name, phone, email, vehicle_type, vehicle_number } =
+      await req.json();
 
     if (!auth_id) {
       return NextResponse.json(
         { error: "auth_id обязателен" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { error } = await supabaseAdmin.from("users").insert({
-      auth_id,
-      full_name: full_name || "",
-      phone: phone || "",
-      email: email || null,
-      role: role || "user",
-    });
+    // 1. Создаём профиль с ролью courier
+    const { data: userProfile, error: userError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        auth_id,
+        full_name: full_name || "",
+        phone: phone || "",
+        email: email || null,
+        role: "courier",
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      console.error("Register error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (userError) {
+      return NextResponse.json({ error: userError.message }, { status: 500 });
+    }
+
+    // 2. Создаём запись в таблице couriers
+    const { error: courierError } = await supabaseAdmin
+      .from("couriers")
+      .insert({
+        user_id: userProfile.id,
+        vehicle_type: vehicle_type || "bicycle",
+        vehicle_number: vehicle_number || null,
+        is_available: false,
+        is_active: true,
+      });
+
+    if (courierError) {
+      await supabaseAdmin.from("users").delete().eq("id", userProfile.id);
+      return NextResponse.json(
+        { error: courierError.message },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Register exception:", err);
     return NextResponse.json({ error: "Внутренняя ошибка" }, { status: 500 });
   }
 }

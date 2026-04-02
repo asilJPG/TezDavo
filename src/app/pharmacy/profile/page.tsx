@@ -21,19 +21,53 @@ export default function PharmacyProfilePage() {
   const { user } = useAuth();
   const [pharmacy, setPharmacy] = useState<PharmacyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    mon_fri: "",
+    sat_sun: "",
+  });
 
   useEffect(() => {
-    const fetchPharmacy = async () => {
-      try {
-        const res = await fetch("/api/pharmacies/my");
-        const data = await res.json();
-        setPharmacy(data.pharmacy);
-      } finally {
+    fetch("/api/pharmacies/my")
+      .then((r) => r.json())
+      .then((d) => {
+        setPharmacy(d.pharmacy);
         setLoading(false);
-      }
-    };
-    if (user) fetchPharmacy();
-  }, [user]);
+      });
+  }, []);
+
+  const startEdit = () => {
+    if (!pharmacy) return;
+    setForm({
+      name: pharmacy.name,
+      phone: pharmacy.phone,
+      mon_fri: pharmacy.working_hours?.mon_fri || "",
+      sat_sun: pharmacy.working_hours?.sat_sun || "",
+    });
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await fetch("/api/pharmacies/my", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          working_hours: { mon_fri: form.mon_fri, sat_sun: form.sat_sun },
+        }),
+      });
+      setEditing(false);
+      window.location.reload();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <PharmacyLayout>
@@ -53,7 +87,6 @@ export default function PharmacyProfilePage() {
 
         {!loading && pharmacy && (
           <div className="space-y-4">
-            {/* Status */}
             <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3">
               <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center text-2xl">
                 🏪
@@ -61,87 +94,121 @@ export default function PharmacyProfilePage() {
               <div className="flex-1">
                 <p className="font-bold text-gray-900">{pharmacy.name}</p>
                 <p className="text-sm text-gray-500">{pharmacy.address}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex gap-2 mt-1">
                   {pharmacy.is_verified ? (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                       ✓ Верифицировано
                     </span>
                   ) : (
                     <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                      ⏳ Ожидает проверки
-                    </span>
-                  )}
-                  {pharmacy.is_active ? (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                      ● Активно
-                    </span>
-                  ) : (
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                      Неактивно
+                      ⏳ На модерации
                     </span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Info */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-              <h2 className="font-semibold text-gray-900 text-sm">
-                Информация
-              </h2>
-              {[
-                { label: "Телефон", value: pharmacy.phone },
-                { label: "Лицензия", value: pharmacy.license_number },
-                { label: "Пн-Пт", value: pharmacy.working_hours?.mon_fri },
-                { label: "Сб-Вс", value: pharmacy.working_hours?.sat_sun },
-                {
-                  label: "Рейтинг",
-                  value: `${pharmacy.rating} ⭐ (${pharmacy.review_count} отзывов)`,
-                },
-              ].map((row) => (
-                <div
-                  key={row.label}
-                  className="flex justify-between items-center py-1 border-b border-gray-50 last:border-0"
-                >
-                  <span className="text-sm text-gray-500">{row.label}</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {row.value}
-                  </span>
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900 text-sm">
+                  Информация
+                </h2>
+                {!editing && (
+                  <button
+                    onClick={startEdit}
+                    className="text-blue-600 text-sm font-medium"
+                  >
+                    Изменить
+                  </button>
+                )}
+              </div>
+              {!editing ? (
+                <div className="space-y-2 text-sm">
+                  {[
+                    { label: "Телефон", value: pharmacy.phone },
+                    { label: "Лицензия", value: pharmacy.license_number },
+                    { label: "Пн-Пт", value: pharmacy.working_hours?.mon_fri },
+                    { label: "Сб-Вс", value: pharmacy.working_hours?.sat_sun },
+                    {
+                      label: "Рейтинг",
+                      value: `${pharmacy.rating} ⭐ (${pharmacy.review_count} отзывов)`,
+                    },
+                  ].map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex justify-between py-1.5 border-b border-gray-50 last:border-0"
+                    >
+                      <span className="text-gray-500">{row.label}</span>
+                      <span className="font-medium text-gray-900">
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-3">
+                  {[
+                    { key: "name", label: "Название аптеки" },
+                    { key: "phone", label: "Телефон" },
+                    {
+                      key: "mon_fri",
+                      label: "Часы работы Пн-Пт (например: 08:00-22:00)",
+                    },
+                    {
+                      key: "sat_sun",
+                      label: "Часы работы Сб-Вс (например: 09:00-20:00)",
+                    },
+                  ].map((f) => (
+                    <div key={f.key}>
+                      <label className="text-xs text-gray-500 mb-1 block">
+                        {f.label}
+                      </label>
+                      <input
+                        value={(form as any)[f.key]}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, [f.key]: e.target.value }))
+                        }
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="flex-1 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={save}
+                      disabled={saving}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                    >
+                      {saving ? "..." : "Сохранить"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Account */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-              <h2 className="font-semibold text-gray-900 text-sm">Аккаунт</h2>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Владелец</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {user?.full_name}
-                </span>
+            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2 text-sm">
+              <h2 className="font-semibold text-gray-900 mb-2">Аккаунт</h2>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Владелец</span>
+                <span className="font-medium">{user?.full_name}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Email</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {user?.email}
-                </span>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email</span>
+                <span className="font-medium">{user?.email}</span>
               </div>
             </div>
 
             <button
               onClick={signOut}
-              className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl font-medium text-sm hover:bg-red-50 transition-colors"
+              className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl font-medium text-sm"
             >
               Выйти из аккаунта
             </button>
-          </div>
-        )}
-
-        {!loading && !pharmacy && (
-          <div className="text-center py-12 bg-white rounded-2xl">
-            <div className="text-4xl mb-3">🏪</div>
-            <p className="text-gray-500 text-sm">Профиль аптеки не найден</p>
-            <p className="text-gray-400 text-xs mt-1">Обратитесь в поддержку</p>
           </div>
         )}
       </div>

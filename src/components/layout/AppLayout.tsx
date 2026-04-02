@@ -35,9 +35,9 @@ const ROLE_NAV: Record<
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { count } = useCart();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  const roleLinks = user ? ROLE_NAV[user.role] ?? [] : [];
+  const roleLinks = user ? (ROLE_NAV[user.role] ?? []) : [];
   const allNav = [...NAV, ...roleLinks];
 
   return (
@@ -70,7 +70,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors relative",
                   active
                     ? "bg-blue-50 text-blue-700 font-semibold"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                 )}
               >
                 <span className="text-lg w-6 text-center">{item.icon}</span>
@@ -86,7 +86,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Bottom: user info */}
-        {user && (
+        {loading && (
+          <div className="px-4 py-4 border-t">
+            <div className="flex items-center gap-3 px-2 animate-pulse">
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 bg-gray-100 rounded w-2/3" />
+                <div className="h-3 bg-gray-100 rounded w-1/2" />
+              </div>
+            </div>
+          </div>
+        )}
+        {!loading && user && (
           <div className="px-4 py-4 border-t">
             <div className="flex items-center gap-3 px-2">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-blue-700">
@@ -101,7 +112,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         )}
-        {!user && (
+        {!loading && !user && (
           <div className="px-4 py-4 border-t space-y-2">
             <Link
               href="/login"
@@ -143,7 +154,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center py-2 relative transition-colors",
-                  active ? "text-blue-600" : "text-gray-400"
+                  active ? "text-blue-600" : "text-gray-400",
                 )}
               >
                 <span className="text-xl">{item.icon}</span>
