@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { PharmacyLayout } from "@/components/layout/PharmacyLayout";
 import { useAuth, signOut } from "@/hooks/useAuth";
+import { ReviewsSection } from "@/components/pharmacy/ReviewsSection";
 
 interface PharmacyData {
   id: string;
@@ -202,7 +203,7 @@ export default function PharmacyProfilePage() {
                 <span className="font-medium">{user?.email}</span>
               </div>
             </div>
-
+            {pharmacy && <ReviewsSection pharmacyId={pharmacy.id} />}
             <button
               onClick={signOut}
               className="w-full py-3 bg-white border border-red-200 text-red-600 rounded-xl font-medium text-sm"

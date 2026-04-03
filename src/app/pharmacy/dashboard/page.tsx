@@ -124,16 +124,16 @@ export default function PharmacyDashboard() {
 
   const newOrders = orders.filter((o) => o.status === "created");
   const activeOrders = orders.filter((o) =>
-    ["pharmacy_confirmed", "courier_assigned", "picked_up"].includes(o.status)
+    ["pharmacy_confirmed", "courier_assigned", "picked_up"].includes(o.status),
   );
   const history = orders.filter((o) =>
-    ["delivered", "cancelled"].includes(o.status)
+    ["delivered", "cancelled"].includes(o.status),
   );
   const displayed =
     tab === "new" ? newOrders : tab === "active" ? activeOrders : history;
   const today = new Date().toDateString();
   const todayOrders = orders.filter(
-    (o) => new Date(o.created_at).toDateString() === today
+    (o) => new Date(o.created_at).toDateString() === today,
   );
   const revenue = todayOrders
     .filter((o) => o.status === "delivered")
@@ -229,9 +229,12 @@ export default function PharmacyDashboard() {
             <div key={order.id} className="bg-white rounded-xl p-4 shadow-sm">
               <div className="flex justify-between mb-2">
                 <div>
-                  <span className="font-bold text-sm">
+                  <Link
+                    href={`/pharmacy/orders/${order.id}`}
+                    className="font-bold text-sm text-blue-600 hover:underline"
+                  >
                     {order.order_number}
-                  </span>
+                  </Link>
                   <p className="text-xs text-gray-400">
                     {new Date(order.created_at).toLocaleString("ru-RU")}
                   </p>

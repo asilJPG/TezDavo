@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { GoogleMap } from "@/components/map/GoogleMap";
+import { ReviewsSection } from "@/components/pharmacy/ReviewsSection";
 import { formatPrice, formatDateTime } from "@/lib/utils";
 import { ORDER_STATUS_LABELS } from "@/types";
 import type { Order, OrderStatus } from "@/types";
@@ -289,6 +290,13 @@ export default function OrderPage() {
           >
             Отменить заказ
           </button>
+        )}
+
+        {/* Review section for delivered orders */}
+        {isDelivered && order.pharmacy_id && (
+          <div className="mt-4">
+            <ReviewsSection pharmacyId={order.pharmacy_id} orderId={order.id} />
+          </div>
         )}
       </div>
     </AppLayout>

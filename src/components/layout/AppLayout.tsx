@@ -27,8 +27,9 @@ const ROLE_NAV: Record<
   ],
   admin: [
     { href: "/admin", icon: "⚙️", label: "Админ панель" },
-    { href: "/admin/users", icon: "👥", label: "Пользователи" },
     { href: "/admin/pharmacies", icon: "🏪", label: "Аптеки" },
+    { href: "/admin/users", icon: "👥", label: "Пользователи" },
+    { href: "/admin/orders", icon: "📦", label: "Все заказы" },
   ],
 };
 
