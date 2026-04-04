@@ -69,19 +69,18 @@ export function useAuth(): AuthState {
       }
 
       // Предотвращаем дублирующие запросы
-      if (!_fetchPromise) {
-        _fetchPromise = supabase
+      _fetchPromise = Promise.resolve(
+        supabase
           .from("users")
           .select("*")
           .eq("auth_id", supabaseUser.id)
-          .single()
-          .then(({ data: user }) => {
-            _cachedUser = user;
-            setCachedUser(user);
-            _fetchPromise = null;
-            if (mounted) setState({ supabaseUser, user, loading: false });
-          });
-      }
+          .single(),
+      ).then(({ data: user }) => {
+        _cachedUser = user;
+        setCachedUser(user);
+        _fetchPromise = null;
+        if (mounted) setState({ supabaseUser, user, loading: false });
+      });
 
       await _fetchPromise;
     };
