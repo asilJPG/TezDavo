@@ -22,6 +22,7 @@ interface PriceRow {
   id: string;
   price: number;
   quantity: number;
+  requires_prescription: boolean;
   pharmacy: Pharmacy;
 }
 interface Medicine {
@@ -95,6 +96,7 @@ export default function MedicinePage() {
       pharmacy_name: row.pharmacy.name,
       medicine_name: medicine.name,
       price: row.price,
+      requires_prescription: row.requires_prescription,
     });
     setAddedId(row.id);
     setTimeout(() => setAddedId(null), 2000);
@@ -141,6 +143,7 @@ export default function MedicinePage() {
         </div>
       </AppLayout>
     );
+
   if (!medicine)
     return (
       <AppLayout>
@@ -241,13 +244,11 @@ export default function MedicinePage() {
                 </button>
               </div>
             )}
-
             {sortBy === "distance" && !location && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-700">
                 Определяем ваше местоположение...
               </div>
             )}
-
             <div className="space-y-3">
               {prices.length === 0 && (
                 <div className="text-center py-16 bg-white rounded-2xl">
@@ -286,6 +287,11 @@ export default function MedicinePage() {
                           {sortBy === "distance" && i === 0 && (
                             <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
                               Ближайшая
+                            </span>
+                          )}
+                          {row.requires_prescription && (
+                            <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full">
+                              🔒 Рецепт
                             </span>
                           )}
                         </div>

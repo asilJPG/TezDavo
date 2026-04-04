@@ -38,14 +38,25 @@ export default function PharmacyInventoryPage() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [medSearch, setMedSearch] = useState("");
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
-  const [addForm, setAddForm] = useState({ price: "", quantity: "" });
+  const [addForm, setAddForm] = useState({
+    price: "",
+    quantity: "",
+    requires_prescription: false,
+  });
 
-  // Create new medicine
+  const [arrival, setArrival] = useState<{
+    id: string;
+    medicine_id: string;
+    name: string;
+    price: number;
+  } | null>(null);
+  const [arrivalQty, setArrivalQty] = useState("");
   const [newMed, setNewMed] = useState({
     name: "",
     category: "Обезболивающие",
     dosage_strength: "",
     dosage_form: "tablet",
+    requires_prescription: false,
   });
 
   const CATEGORIES = [
@@ -82,7 +93,7 @@ export default function PharmacyInventoryPage() {
       return;
     }
     const res = await fetch(
-      `/api/medicines?q=${encodeURIComponent(q)}&limit=8`
+      `/api/medicines?q=${encodeURIComponent(q)}&limit=8`,
     );
     const data = await res.json();
     setMedicines(data.medicines || []);
@@ -104,6 +115,7 @@ export default function PharmacyInventoryPage() {
           medicine_id: selectedMed.id,
           price: Number(addForm.price),
           quantity: Number(addForm.quantity),
+          requires_prescription: addForm.requires_prescription,
         }),
       });
       closeModal();
@@ -137,6 +149,7 @@ export default function PharmacyInventoryPage() {
           medicine_id: data.medicine.id,
           price: Number(addForm.price),
           quantity: Number(addForm.quantity),
+          requires_prescription: addForm.requires_prescription,
         }),
       });
       closeModal();
@@ -167,17 +180,18 @@ export default function PharmacyInventoryPage() {
     setSelectedMed(null);
     setMedSearch("");
     setMedicines([]);
-    setAddForm({ price: "", quantity: "" });
+    setAddForm({ price: "", quantity: "", requires_prescription: false });
     setNewMed({
       name: "",
       category: "Обезболивающие",
       dosage_strength: "",
       dosage_form: "tablet",
+      requires_prescription: false,
     });
   };
 
   const filtered = items.filter((i) =>
-    i.medicine.name.toLowerCase().includes(search.toLowerCase())
+    i.medicine.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -319,18 +333,33 @@ export default function PharmacyInventoryPage() {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditing(item.id);
-                      setEditForm({
-                        price: item.price,
-                        quantity: item.quantity,
-                      });
-                    }}
-                    className="text-blue-600 text-sm font-medium"
-                  >
-                    Изменить
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setArrival({
+                          id: item.id,
+                          medicine_id: (item.medicine as any).id,
+                          name: item.medicine.name,
+                          price: item.price,
+                        })
+                      }
+                      className="text-green-600 text-sm font-medium"
+                    >
+                      + Приход
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditing(item.id);
+                        setEditForm({
+                          price: item.price,
+                          quantity: item.quantity,
+                        });
+                      }}
+                      className="text-blue-600 text-sm font-medium"
+                    >
+                      Изменить
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -467,6 +496,23 @@ export default function PharmacyInventoryPage() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400"
                     />
                   </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="rx_fill"
+                      checked={addForm.requires_prescription}
+                      onChange={(e) =>
+                        setAddForm((p) => ({
+                          ...p,
+                          requires_prescription: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded accent-blue-600"
+                    />
+                    <label htmlFor="rx_fill" className="text-sm text-gray-700">
+                      🔒 Требуется рецепт
+                    </label>
+                  </div>
                   <button
                     onClick={addToInventory}
                     disabled={saving || !addForm.price || !addForm.quantity}
@@ -524,6 +570,26 @@ export default function PharmacyInventoryPage() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400"
                     />
                   </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="rx_required"
+                      checked={newMed.requires_prescription}
+                      onChange={(e) =>
+                        setNewMed((p) => ({
+                          ...p,
+                          requires_prescription: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded accent-blue-600"
+                    />
+                    <label
+                      htmlFor="rx_required"
+                      className="text-sm text-gray-700"
+                    >
+                      🔒 Требуется рецепт
+                    </label>
+                  </div>
                   <div className="border-t pt-4">
                     <p className="text-xs font-medium text-gray-500 mb-3">
                       Цена и количество
@@ -576,6 +642,88 @@ export default function PharmacyInventoryPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Arrival modal */}
+      {arrival && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-gray-900">Приход товара</h2>
+              <button
+                onClick={() => {
+                  setArrival(null);
+                  setArrivalQty("");
+                }}
+                className="text-gray-400 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="bg-blue-50 rounded-xl px-4 py-3 mb-4">
+              <p className="font-semibold text-gray-900 text-sm">
+                {arrival.name}
+              </p>
+              <p className="text-xs text-gray-500">
+                Текущая цена: {formatPrice(arrival.price)}
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Количество (шт.) *
+              </label>
+              <input
+                type="number"
+                value={arrivalQty}
+                onChange={(e) => setArrivalQty(e.target.value)}
+                placeholder="например: 50"
+                autoFocus
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Будет добавлено к текущему количеству
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setArrival(null);
+                  setArrivalQty("");
+                }}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={async () => {
+                  if (!arrivalQty || !arrival) return;
+                  setSaving(true);
+                  try {
+                    await fetch("/api/pharmacy/inventory", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        medicine_id: arrival.medicine_id,
+                        price: arrival.price,
+                        quantity: Number(arrivalQty),
+                        mode: "arrival",
+                      }),
+                    });
+                    setArrival(null);
+                    setArrivalQty("");
+                    loadInventory();
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving || !arrivalQty}
+                className="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              >
+                {saving ? "..." : "+ Принять"}
+              </button>
             </div>
           </div>
         </div>

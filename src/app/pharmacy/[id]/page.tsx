@@ -5,12 +5,12 @@ import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/lib/utils";
-import { ReviewsSection } from "@/components/pharmacy/ReviewsSection";
 
 interface Inventory {
   id: string;
   price: number;
   quantity: number;
+  requires_prescription: boolean;
   medicine: {
     id: string;
     name: string;
@@ -42,7 +42,6 @@ export default function PharmacyPublicPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [addedId, setAddedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"medicines" | "reviews">("medicines");
 
   useEffect(() => {
     fetch(`/api/pharmacies/${id}`)
@@ -66,6 +65,7 @@ export default function PharmacyPublicPage() {
       pharmacy_name: pharmacy.name,
       medicine_name: item.medicine.name,
       price: item.price,
+      requires_prescription: item.requires_prescription,
     });
     setAddedId(item.id);
     setTimeout(() => setAddedId(null), 1500);
@@ -129,21 +129,14 @@ export default function PharmacyPublicPage() {
               <p className="text-gray-500 text-sm mt-0.5">
                 📍 {pharmacy.address}
               </p>
-              <button
-                onClick={() => setTab("reviews")}
-                className="flex items-center gap-1 mt-1 hover:underline"
-              >
-                <span className="text-amber-400 text-sm">
-                  {"★".repeat(Math.round(pharmacy.rating))}
-                  {"☆".repeat(5 - Math.round(pharmacy.rating))}
-                </span>
-                <span className="font-bold text-gray-900 text-sm">
-                  {pharmacy.rating.toFixed(1)}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-amber-500 text-sm">
+                  ⭐ {pharmacy.rating.toFixed(1)}
                 </span>
                 <span className="text-gray-400 text-xs">
                   ({pharmacy.review_count} отзывов)
                 </span>
-              </button>
+              </div>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
@@ -168,85 +161,65 @@ export default function PharmacyPublicPage() {
           </a>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setTab("medicines")}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${tab === "medicines" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}
-          >
-            💊 Лекарства ({inventory.length})
-          </button>
-          <button
-            onClick={() => setTab("reviews")}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${tab === "reviews" ? "bg-blue-600 text-white" : "bg-white text-gray-600"}`}
-          >
-            ⭐ Отзывы ({pharmacy.review_count})
-          </button>
-        </div>
+        {/* Search */}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по аптеке..."
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 mb-4"
+        />
+        <p className="text-xs text-gray-500 mb-3">
+          {filtered.length} позиций в наличии
+        </p>
 
-        {tab === "medicines" && (
-          <>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по аптеке..."
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 mb-4"
-            />
-            <p className="text-xs text-gray-500 mb-3">
-              {filtered.length} позиций в наличии
-            </p>
-            <div className="space-y-2">
-              {filtered.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-xl p-4 shadow-sm flex items-center gap-3"
-                >
-                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-xl">💊</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <Link href={`/medicine/${item.medicine.id}`}>
-                      <p className="font-medium text-gray-900 text-sm truncate">
-                        {item.medicine.name}
-                      </p>
-                    </Link>
-                    {item.medicine.generic_name && (
-                      <p className="text-xs text-gray-400 truncate">
-                        {item.medicine.generic_name}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-bold text-blue-600 text-sm">
-                        {formatPrice(item.price)}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {item.quantity} шт.
-                      </span>
-                      {item.medicine.requires_prescription && (
-                        <span className="bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full">
-                          Рецепт
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleAdd(item)}
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${addedId === item.id ? "bg-green-500 text-white" : "bg-blue-600 text-white"}`}
-                  >
-                    {addedId === item.id ? "✓" : "+"}
-                  </button>
+        <div className="space-y-2">
+          {filtered.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white rounded-xl p-4 shadow-sm flex items-center gap-3"
+            >
+              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-xl">💊</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <Link href={`/medicine/${item.medicine.id}`}>
+                  <p className="font-medium text-gray-900 text-sm truncate">
+                    {item.medicine.name}
+                  </p>
+                </Link>
+                {item.medicine.generic_name && (
+                  <p className="text-xs text-gray-400 truncate">
+                    {item.medicine.generic_name}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-bold text-blue-600 text-sm">
+                    {formatPrice(item.price)}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {item.quantity} шт.
+                  </span>
+                  {item.medicine.requires_prescription && (
+                    <span className="bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full">
+                      Рецепт
+                    </span>
+                  )}
                 </div>
-              ))}
-              {filtered.length === 0 && search && (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 text-sm">Ничего не найдено</p>
-                </div>
-              )}
+              </div>
+              <button
+                onClick={() => handleAdd(item)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${addedId === item.id ? "bg-green-500 text-white" : "bg-blue-600 text-white"}`}
+              >
+                {addedId === item.id ? "✓" : "+"}
+              </button>
             </div>
-          </>
-        )}
-
-        {tab === "reviews" && <ReviewsSection pharmacyId={id} />}
+          ))}
+          {filtered.length === 0 && search && (
+            <div className="text-center py-10">
+              <p className="text-gray-500 text-sm">Ничего не найдено</p>
+            </div>
+          )}
+        </div>
       </div>
     </AppLayout>
   );

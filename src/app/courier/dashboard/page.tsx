@@ -19,6 +19,12 @@ export default function CourierDashboard() {
   const lastUpdateRef = useRef<number>(0);
 
   useEffect(() => {
+    // Загружаем статус онлайн с сервера при маунте
+    fetch("/api/couriers/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.courier?.is_available) setIsOnline(true);
+      });
     load();
     const t = setInterval(load, 20_000);
     return () => clearInterval(t);
@@ -106,8 +112,15 @@ export default function CourierDashboard() {
     ["delivered", "cancelled"].includes(o.status),
   );
   const delivered = history.filter((o) => o.status === "delivered");
+  // Если офлайн — скрываем доступные заказы
   const displayed =
-    tab === "available" ? available : tab === "my" ? myOrders : history;
+    tab === "available"
+      ? isOnline
+        ? available
+        : []
+      : tab === "my"
+        ? myOrders
+        : history;
 
   return (
     <CourierLayout>

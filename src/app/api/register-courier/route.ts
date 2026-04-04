@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
       });
 
     if (courierError) {
+      console.error(
+        "Ошибка при создании курьера (Айспик ебаный даун лох сука пидр):",
+        JSON.stringify(courierError),
+      );
       await supabaseAdmin.from("users").delete().eq("id", userProfile.id);
       return NextResponse.json(
         { error: courierError.message },

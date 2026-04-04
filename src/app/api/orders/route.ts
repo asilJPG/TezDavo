@@ -6,7 +6,7 @@ import { createClient as createAdmin } from "@supabase/supabase-js";
 const getAdminClient = () =>
   createAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
 export async function GET(req: NextRequest) {
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("orders")
     .select(
-      `*, pharmacy:pharmacies(id, name, address, phone), items:order_items(*)`
+      `*, pharmacy:pharmacies(id, name, address, phone), items:order_items(*)`,
     )
     .order("created_at", { ascending: false });
 
@@ -76,12 +76,13 @@ export async function POST(req: NextRequest) {
     delivery_lat,
     delivery_lng,
     notes,
+    prescription_url,
   } = body;
 
   if (!pharmacy_id || !items?.length || !delivery_address) {
     return NextResponse.json(
       { error: "Не все поля заполнены" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
 
   // Проверяем инвентарь
   const inventoryIds = items.map(
-    (i: { inventory_id: string }) => i.inventory_id
+    (i: { inventory_id: string }) => i.inventory_id,
   );
   const { data: inventoryItems } = await supabaseAdmin
     .from("pharmacy_inventory")
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
   if (!inventoryItems || inventoryItems.length !== items.length) {
     return NextResponse.json(
       { error: "Некоторые товары недоступны" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -115,13 +116,13 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
         unit_price: inv.price,
       };
-    }
+    },
   );
 
   const subtotal = orderItems.reduce(
     (sum: number, item: { quantity: number; unit_price: number }) =>
       sum + item.quantity * item.unit_price,
-    0
+    0,
   );
 
   const { data: order, error: orderError } = await supabaseAdmin
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest) {
       delivery_lat,
       delivery_lng,
       notes,
+      prescription_url: prescription_url || null,
     })
     .select()
     .single();
@@ -145,14 +147,14 @@ export async function POST(req: NextRequest) {
     console.error("Order error:", orderError);
     return NextResponse.json(
       { error: "Ошибка создания заказа" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   await supabaseAdmin
     .from("order_items")
     .insert(
-      orderItems.map((item: object) => ({ ...item, order_id: order.id }))
+      orderItems.map((item: object) => ({ ...item, order_id: order.id })),
     );
 
   return NextResponse.json({ order }, { status: 201 });

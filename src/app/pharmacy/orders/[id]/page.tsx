@@ -186,6 +186,24 @@ export default function PharmacyOrderPage() {
           </div>
         </div>
 
+        {/* Prescription */}
+        {order.prescription_url && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+            <h2 className="font-semibold text-gray-900 text-sm mb-3">
+              🔒 Рецепт
+            </h2>
+            <img
+              src={order.prescription_url}
+              alt="Рецепт"
+              className="w-full rounded-xl border border-gray-200 cursor-pointer"
+              onClick={() => window.open(order.prescription_url!, "_blank")}
+            />
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              Нажмите для увеличения
+            </p>
+          </div>
+        )}
+
         {/* Курьер */}
         {order.courier_id && (
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">

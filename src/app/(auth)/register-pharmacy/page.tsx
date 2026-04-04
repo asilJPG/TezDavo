@@ -37,7 +37,7 @@ export default function RegisterPharmacyPage() {
         setError(
           authError.message.includes("already registered")
             ? "Этот email уже зарегистрирован"
-            : authError.message
+            : authError.message,
         );
         setLoading(false);
         return;
@@ -151,31 +151,56 @@ export default function RegisterPharmacyPage() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
                 Данные аптеки
               </p>
-              {[
-                {
-                  key: "pharmacy_name",
-                  label: "Название аптеки *",
-                  placeholder: "Аптека Хаёт",
-                },
-                {
-                  key: "pharmacy_address",
-                  label: "Адрес аптеки *",
-                  placeholder: "ул. Амира Темура 15, Ташкент",
-                },
-                {
-                  key: "license_number",
-                  label: "Номер лицензии *",
-                  placeholder: "LIC-001-2024",
-                },
-              ].map((f) => (
-                <div key={f.key} className="mb-3">
+              {(
+                [
+                  {
+                    key: "full_name",
+                    label: "Полное имя *",
+                    placeholder: "Иван Иванов",
+                    type: "text",
+                  },
+                  {
+                    key: "phone",
+                    label: "Телефон *",
+                    placeholder: "+998901234567",
+                    type: "tel",
+                  },
+                  {
+                    key: "email",
+                    label: "Email *",
+                    placeholder: "your@email.com",
+                    type: "email",
+                  },
+                  {
+                    key: "password",
+                    label: "Пароль *",
+                    placeholder: "Минимум 6 символов",
+                    type: "password",
+                  },
+                ] as {
+                  key: string;
+                  label: string;
+                  placeholder: string;
+                  type: string;
+                }[]
+              ).map((f) => (
+                <div key={f.key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {f.label}
                   </label>
                   <input
                     required
+                    type={f.type}
+                    minLength={f.key === "password" ? 6 : undefined}
+                    maxLength={f.key === "phone" ? 13 : undefined}
                     value={(form as any)[f.key]}
-                    onChange={set(f.key)}
+                    onChange={(e) => {
+                      const val =
+                        f.key === "phone"
+                          ? e.target.value.replace(/[^\d+]/g, "")
+                          : e.target.value;
+                      setForm((p) => ({ ...p, [f.key]: val }));
+                    }}
                     placeholder={f.placeholder}
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
                   />

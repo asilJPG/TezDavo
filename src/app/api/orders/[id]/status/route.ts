@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { sendPushToMany } from "@/lib/firebase-admin";
 import { OrderStatus } from "@/types";
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -11,6 +12,26 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   picked_up: ["delivered"],
   delivered: [],
   cancelled: [],
+};
+
+const NOTIFICATIONS: Record<string, { title: string; body: string }> = {
+  pharmacy_confirmed: {
+    title: "✅ Заказ подтверждён",
+    body: "Аптека подтвердила ваш заказ. Ищем курьера...",
+  },
+  courier_assigned: {
+    title: "🚴 Курьер назначен",
+    body: "Курьер едет в аптеку за вашим заказом",
+  },
+  picked_up: {
+    title: "📦 Курьер забрал заказ",
+    body: "Курьер уже везёт ваш заказ",
+  },
+  delivered: {
+    title: "🏠 Заказ доставлен",
+    body: "Ваш заказ успешно доставлен!",
+  },
+  cancelled: { title: "❌ Заказ отменён", body: "Ваш заказ был отменён" },
 };
 
 export async function PATCH(
@@ -76,5 +97,28 @@ export async function PATCH(
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Push уведомление покупателю
+  const notif = NOTIFICATIONS[status];
+  if (notif && order.user_id) {
+    try {
+      const { data: tokens } = await supabaseAdmin
+        .from("push_tokens")
+        .select("token")
+        .eq("user_id", order.user_id);
+
+      if (tokens?.length) {
+        await sendPushToMany(
+          tokens.map((t: any) => t.token),
+          notif.title,
+          notif.body,
+          `/order/${params.id}`,
+        );
+      }
+    } catch (err) {
+      console.error("Push failed:", err);
+    }
+  }
+
   return NextResponse.json({ order: data });
 }

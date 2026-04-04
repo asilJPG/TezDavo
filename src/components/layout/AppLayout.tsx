@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { PushNotificationBanner } from "@/components/PushNotificationBanner";
 
 const NAV = [
   { href: "/", icon: "🏠", label: "Главная" },
@@ -170,6 +171,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </div>
       </nav>
+      <PushNotificationBanner isLoggedIn={!!user} userRole={user?.role} />
     </div>
   );
 }

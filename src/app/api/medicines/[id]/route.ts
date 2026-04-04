@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase-server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   const supabase = createClient();
 
@@ -17,11 +17,10 @@ export async function GET(
   if (error || !medicine) {
     return NextResponse.json(
       { error: "Лекарство не найдено" },
-      { status: 404 }
+      { status: 404 },
     );
   }
 
-  // Фильтруем по quantity > 0 (in_stock колонки нет в схеме)
   const { data: inventory } = await supabase
     .from("pharmacy_inventory")
     .select(
@@ -29,8 +28,9 @@ export async function GET(
       id,
       price,
       quantity,
+      requires_prescription,
       pharmacy:pharmacies(id, name, address, lat, lng, phone, rating, is_verified, working_hours)
-    `
+    `,
     )
     .eq("medicine_id", params.id)
     .gt("quantity", 0)

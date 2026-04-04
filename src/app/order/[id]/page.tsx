@@ -283,7 +283,7 @@ export default function OrderPage() {
         </div>
 
         {/* Cancel button */}
-        {order.status === "created" && (
+        {["created", "pharmacy_confirmed"].includes(order.status) && (
           <button
             onClick={cancel}
             className="w-full py-3 border border-red-200 text-red-600 rounded-xl font-medium text-sm hover:bg-red-50"
