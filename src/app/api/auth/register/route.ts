@@ -1,4 +1,4 @@
-// src/app/api/auth/register/route.ts
+// src/app/api/auth/register-pharmacy/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,34 +11,89 @@ export async function POST(req: NextRequest) {
         fetch: (url: RequestInfo | URL, options?: RequestInit) =>
           fetch(url, { ...options, cache: "no-store" }),
       },
-    }
+    },
   );
-  try {
-    const { auth_id, full_name, phone, email, role } = await req.json();
 
-    if (!auth_id) {
+  try {
+    const {
+      auth_id,
+      full_name,
+      phone,
+      email,
+      pharmacy_name,
+      pharmacy_address,
+      license_number,
+    } = await req.json();
+
+    if (!auth_id || !pharmacy_name || !license_number) {
       return NextResponse.json(
-        { error: "auth_id обязателен" },
-        { status: 400 }
+        { error: "Не все поля заполнены" },
+        { status: 400 },
       );
     }
 
-    const { error } = await supabaseAdmin.from("users").insert({
-      auth_id,
-      full_name: full_name || "",
-      phone: phone || "",
-      email: email || null,
-      role: role || "user",
-    });
+    // 1. Создаём профиль пользователя с ролью pharmacy
+    const { data: userProfile, error: userError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        auth_id,
+        full_name: full_name || "",
+        phone: phone || "",
+        email: email || null,
+        role: "pharmacy",
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      console.error("Register error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (userError) {
+      console.error("User insert error:", userError);
+      return NextResponse.json({ error: userError.message }, { status: 500 });
+    }
+
+    // 2. Геокодируем адрес → координаты
+    let lat = 41.2995;
+    let lng = 69.2401;
+    try {
+      const geoRes = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(pharmacy_address + ", Ташкент, Узбекистан")}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`,
+      );
+      const geoData = await geoRes.json();
+      if (geoData.results?.[0]?.geometry?.location) {
+        lat = geoData.results[0].geometry.location.lat;
+        lng = geoData.results[0].geometry.location.lng;
+      }
+    } catch (err) {
+      console.error("Geocoding error:", err);
+    }
+
+    // 3. Создаём запись аптеки
+    const { error: pharmacyError } = await supabaseAdmin
+      .from("pharmacies")
+      .insert({
+        user_id: userProfile.id,
+        name: pharmacy_name,
+        address: pharmacy_address || "Ташкент",
+        phone: phone || "",
+        license_number,
+        lat,
+        lng,
+        is_verified: false,
+        is_active: false,
+      });
+
+    if (pharmacyError) {
+      console.error("Pharmacy insert error:", pharmacyError);
+      // Откатываем пользователя
+      await supabaseAdmin.from("users").delete().eq("id", userProfile.id);
+      return NextResponse.json(
+        { error: pharmacyError.message },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Register exception:", err);
+    console.error("Register pharmacy exception:", err);
     return NextResponse.json({ error: "Внутренняя ошибка" }, { status: 500 });
   }
 }
