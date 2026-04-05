@@ -201,7 +201,7 @@ export default function ProfilePage() {
                   {user.full_name}
                 </p>
                 <p className="text-gray-500 text-sm">{user.phone}</p>
-                {user.email && (
+                {user.email && !user.email.endsWith('@tezdavo.uz') && (
                   <p className="text-gray-400 text-xs">{user.email}</p>
                 )}
                 <span className="inline-flex mt-1.5 bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-medium">
