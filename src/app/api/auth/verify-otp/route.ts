@@ -4,7 +4,6 @@ import { createHash } from 'crypto';
 
 const TG_GATEWAY = 'https://gatewayapi.telegram.org';
 
-// Генерирует детерминированный пароль из номера телефона + серверный секрет
 function makePassword(phone: string) {
   return createHash('sha256')
     .update(`${phone}__${process.env.SUPABASE_SERVICE_ROLE_KEY!.slice(0, 20)}`)
@@ -36,15 +35,13 @@ export async function POST(req: NextRequest) {
 
     if (!verifyData.ok || verificationStatus !== 'code_valid') {
       const msg =
-        verificationStatus === 'code_invalid'
-          ? 'Неверный код'
-          : verificationStatus === 'code_expired'
-          ? 'Код устарел. Запросите новый'
-          : 'Неверный код';
+        verificationStatus === 'code_invalid' ? 'Неверный код' :
+        verificationStatus === 'code_expired' ? 'Код устарел. Запросите новый' :
+        'Неверный код';
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
-    // ── 2. Создаём / получаем пользователя в Supabase ──────────────────────
+    // ── 2. Supabase: создаём или получаем пользователя ──────────────────────
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -54,86 +51,45 @@ export async function POST(req: NextRequest) {
     const email = `${digits}@tezdavo.uz`;
     const password = makePassword(phone);
 
-    // ── 3. Пробуем сразу войти (пользователь уже зарегистрирован?) ──────────
+    // Регистрация — создаём нового пользователя
+    if (name) {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { role: role || 'user', name, phone },
+      });
+
+      if (createError || !newUser?.user) {
+        console.error('createUser error:', createError);
+        return NextResponse.json({ error: 'Ошибка создания аккаунта' }, { status: 500 });
+      }
+
+      await supabaseAdmin.from('users').upsert(
+        { auth_id: newUser.user.id, full_name: name, phone, role: role || 'user' },
+        { onConflict: 'auth_id' }
+      );
+    }
+
+    // ── 3. Входим и получаем сессию ─────────────────────────────────────────
     const supabaseAnon = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    const { data: existingSession, error: signInError } =
+    const { data: session, error: signInError } =
       await supabaseAnon.auth.signInWithPassword({ email, password });
 
-    if (existingSession?.session) {
-      // Пользователь уже есть — просто возвращаем сессию
-      // Синхронизируем users таблицу на случай если запись отсутствует
-      await supabaseAdmin.from('users').upsert(
-        {
-          auth_id: existingSession.user!.id,
-          full_name: name || existingSession.user!.user_metadata?.name || '',
-          phone,
-          role: existingSession.user!.user_metadata?.role || role || 'user',
-        },
-        { onConflict: 'auth_id' }
-      );
-
-      return NextResponse.json({
-        ok: true,
-        access_token: existingSession.session.access_token,
-        refresh_token: existingSession.session.refresh_token,
-        role: existingSession.user!.user_metadata?.role || 'user',
-      });
-    }
-
-    // ── 4. Пользователь не существует ───────────────────────────────────────
-    // Логин без регистрации — отказываем
-    if (!name) {
-      return NextResponse.json(
-        { error: 'Аккаунт с этим номером не найден. Пожалуйста, зарегистрируйтесь.' },
-        { status: 404 }
-      );
-    }
-
-    // ── 5. Регистрация — создаём нового пользователя ────────────────────────
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        role: role || 'user',
-        name: name || '',
-        phone,
-      },
-    });
-
-    if (createError || !newUser?.user) {
-      console.error('createUser error:', createError);
-      return NextResponse.json({ error: 'Ошибка создания аккаунта' }, { status: 500 });
-    }
-
-    await supabaseAdmin.from('users').upsert(
-      {
-        auth_id: newUser.user.id,
-        full_name: name || '',
-        phone,
-        role: role || 'user',
-      },
-      { onConflict: 'auth_id' }
-    );
-
-    // ── 6. Входим под новым пользователем ───────────────────────────────────
-    const { data: newSession, error: newSignInError } =
-      await supabaseAnon.auth.signInWithPassword({ email, password });
-
-    if (newSignInError || !newSession?.session) {
-      console.error('newSignIn error:', newSignInError);
+    if (signInError || !session?.session) {
+      console.error('signIn error:', signInError);
       return NextResponse.json({ error: 'Ошибка входа в систему' }, { status: 500 });
     }
 
     return NextResponse.json({
       ok: true,
-      access_token: newSession.session.access_token,
-      refresh_token: newSession.session.refresh_token,
-      role: newSession.user?.user_metadata?.role || 'user',
+      access_token: session.session.access_token,
+      refresh_token: session.session.refresh_token,
+      role: session.user?.user_metadata?.role || 'user',
     });
 
   } catch (err) {
