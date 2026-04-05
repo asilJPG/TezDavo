@@ -50,29 +50,51 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Используем номер телефона как основу для email (скрытый, пользователь его не видит)
-    const digits = phone.replace(/\D/g, ''); // только цифры: 998901234567
+    const digits = phone.replace(/\D/g, '');
     const email = `${digits}@tezdavo.uz`;
     const password = makePassword(phone);
 
-    // Если это логин (нет name) — проверяем что аккаунт существует
-    if (!name) {
-      const { data: existingProfile } = await supabaseAdmin
-        .from('users')
-        .select('auth_id')
-        .eq('phone', phone)
-        .single();
+    // ── 3. Пробуем сразу войти (пользователь уже зарегистрирован?) ──────────
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-      if (!existingProfile) {
-        return NextResponse.json(
-          { error: 'Аккаунт с этим номером не найден. Пожалуйста, зарегистрируйтесь.' },
-          { status: 404 }
-        );
-      }
+    const { data: existingSession, error: signInError } =
+      await supabaseAnon.auth.signInWithPassword({ email, password });
+
+    if (existingSession?.session) {
+      // Пользователь уже есть — просто возвращаем сессию
+      // Синхронизируем users таблицу на случай если запись отсутствует
+      await supabaseAdmin.from('users').upsert(
+        {
+          auth_id: existingSession.user!.id,
+          full_name: name || existingSession.user!.user_metadata?.name || '',
+          phone,
+          role: existingSession.user!.user_metadata?.role || role || 'user',
+        },
+        { onConflict: 'auth_id' }
+      );
+
+      return NextResponse.json({
+        ok: true,
+        access_token: existingSession.session.access_token,
+        refresh_token: existingSession.session.refresh_token,
+        role: existingSession.user!.user_metadata?.role || 'user',
+      });
     }
 
-    // Пробуем создать нового пользователя
-    const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+    // ── 4. Пользователь не существует ───────────────────────────────────────
+    // Логин без регистрации — отказываем
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Аккаунт с этим номером не найден. Пожалуйста, зарегистрируйтесь.' },
+        { status: 404 }
+      );
+    }
+
+    // ── 5. Регистрация — создаём нового пользователя ────────────────────────
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -83,39 +105,37 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Если пользователь только что создан — добавляем в таблицу users
-    if (newUser?.user) {
-      await supabaseAdmin.from('users').upsert(
-        {
-          auth_id: newUser.user.id,
-          full_name: name || '',
-          phone,
-          role: role || 'user',
-        },
-        { onConflict: 'auth_id' }
-      );
+    if (createError || !newUser?.user) {
+      console.error('createUser error:', createError);
+      return NextResponse.json({ error: 'Ошибка создания аккаунта' }, { status: 500 });
     }
 
-    // ── 3. Входим чтобы получить сессию ────────────────────────────────────
-    const supabaseAnon = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    await supabaseAdmin.from('users').upsert(
+      {
+        auth_id: newUser.user.id,
+        full_name: name || '',
+        phone,
+        role: role || 'user',
+      },
+      { onConflict: 'auth_id' }
     );
 
-    const { data: session, error: signInError } =
+    // ── 6. Входим под новым пользователем ───────────────────────────────────
+    const { data: newSession, error: newSignInError } =
       await supabaseAnon.auth.signInWithPassword({ email, password });
 
-    if (signInError || !session.session) {
-      console.error('signIn error:', signInError);
+    if (newSignInError || !newSession?.session) {
+      console.error('newSignIn error:', newSignInError);
       return NextResponse.json({ error: 'Ошибка входа в систему' }, { status: 500 });
     }
 
     return NextResponse.json({
       ok: true,
-      access_token: session.session.access_token,
-      refresh_token: session.session.refresh_token,
-      role: session.user?.user_metadata?.role || 'user',
+      access_token: newSession.session.access_token,
+      refresh_token: newSession.session.refresh_token,
+      role: newSession.user?.user_metadata?.role || 'user',
     });
+
   } catch (err) {
     console.error('verify-otp exception:', err);
     return NextResponse.json({ error: 'Внутренняя ошибка' }, { status: 500 });
