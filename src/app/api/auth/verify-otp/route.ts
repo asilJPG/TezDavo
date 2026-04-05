@@ -30,15 +30,17 @@ export async function POST(req: NextRequest) {
     });
 
     const verifyData = await verifyResp.json();
-    const status = verifyData.result?.status?.status;
+    console.log('Telegram Gateway verify response:', JSON.stringify(verifyData));
 
-    if (!verifyData.ok || status !== 'code_valid') {
+    const verificationStatus = verifyData.result?.verification_status?.status;
+
+    if (!verifyData.ok || verificationStatus !== 'code_valid') {
       const msg =
-        status === 'code_invalid'
+        verificationStatus === 'code_invalid'
           ? 'Неверный код'
-          : status === 'code_expired'
+          : verificationStatus === 'code_expired'
           ? 'Код устарел. Запросите новый'
-          : 'Ошибка проверки кода';
+          : 'Неверный код';
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
