@@ -55,6 +55,22 @@ export async function POST(req: NextRequest) {
     const email = `${digits}@tezdavo.uz`;
     const password = makePassword(phone);
 
+    // Если это логин (нет name) — проверяем что аккаунт существует
+    if (!name) {
+      const { data: existingProfile } = await supabaseAdmin
+        .from('users')
+        .select('auth_id')
+        .eq('phone', phone)
+        .single();
+
+      if (!existingProfile) {
+        return NextResponse.json(
+          { error: 'Аккаунт с этим номером не найден. Пожалуйста, зарегистрируйтесь.' },
+          { status: 404 }
+        );
+      }
+    }
+
     // Пробуем создать нового пользователя
     const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
       email,
