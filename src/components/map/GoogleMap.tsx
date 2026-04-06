@@ -58,7 +58,7 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     };
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=routes,marker&callback=initGoogleMap`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=directions&callback=initGoogleMap`;
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);

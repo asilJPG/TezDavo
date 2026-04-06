@@ -198,12 +198,10 @@ export default function PharmacyProfilePage() {
                 <span className="text-gray-500">Владелец</span>
                 <span className="font-medium">{user?.full_name}</span>
               </div>
-              {user?.email && !user.email.endsWith('@tezdavo.uz') && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Email</span>
-                  <span className="font-medium">{user.email}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email</span>
+                <span className="font-medium">{user?.email}</span>
+              </div>
             </div>
             {pharmacy && <ReviewsSection pharmacyId={pharmacy.id} />}
             <button
