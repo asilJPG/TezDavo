@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "initData required" }, { status: 400 });
   }
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken = process.env.BOT_TOKEN;
   if (!botToken) {
     return NextResponse.json(
       { error: "Bot token not configured" },
