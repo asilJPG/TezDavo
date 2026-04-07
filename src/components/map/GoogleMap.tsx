@@ -58,7 +58,7 @@ function loadGoogleMaps(apiKey: string): Promise<void> {
     };
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=directions&callback=initGoogleMap`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=routes,marker,places&v=weekly&callback=initGoogleMap`;
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);
@@ -82,7 +82,6 @@ export function GoogleMap({
   const [mapReady, setMapReady] = useState(false);
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!;
-
   useEffect(() => {
     loadGoogleMaps(apiKey).then(() => setMapReady(true));
   }, [apiKey]);

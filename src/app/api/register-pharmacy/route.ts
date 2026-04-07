@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
         fetch: (url: RequestInfo | URL, options?: RequestInit) =>
           fetch(url, { ...options, cache: "no-store" }),
       },
-    }
+    },
   );
 
   try {
@@ -23,12 +23,14 @@ export async function POST(req: NextRequest) {
       pharmacy_name,
       pharmacy_address,
       license_number,
+      lat,
+      lng,
     } = await req.json();
 
     if (!auth_id || !pharmacy_name || !license_number) {
       return NextResponse.json(
         { error: "Не все поля заполнены" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,7 +52,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: userError.message }, { status: 500 });
     }
 
-    // 2. Создаём запись аптеки
+    // 2. Геокодируем адрес
+    let pharmacyLat = lat ?? 41.2995;
+    let pharmacyLng = lng ?? 69.2401;
+
+    if (pharmacy_address && process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY) {
+      try {
+        const geoRes = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(pharmacy_address + ", Ташкент, Узбекистан")}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`,
+        );
+        const geoData = await geoRes.json();
+        if (geoData.results?.[0]?.geometry?.location) {
+          pharmacyLat = geoData.results[0].geometry.location.lat;
+          pharmacyLng = geoData.results[0].geometry.location.lng;
+        }
+      } catch (err) {
+        console.error("Geocoding error:", err);
+      }
+    }
+
+    // 3. Создаём запись аптеки
     const { error: pharmacyError } = await supabaseAdmin
       .from("pharmacies")
       .insert({
@@ -59,8 +80,8 @@ export async function POST(req: NextRequest) {
         address: pharmacy_address || "Ташкент",
         phone: phone || "",
         license_number,
-        lat: 41.2995,
-        lng: 69.2401,
+        lat: pharmacyLat,
+        lng: pharmacyLng,
         is_verified: false,
         is_active: false,
       });
@@ -71,7 +92,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from("users").delete().eq("id", userProfile.id);
       return NextResponse.json(
         { error: pharmacyError.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 

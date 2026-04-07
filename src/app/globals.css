@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 :root {
-  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
 }
 
 * {
@@ -34,11 +34,28 @@ body {
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+.pac-container {
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
 
+.pac-item {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+.pac-container {
+  z-index: 99999 !important;
+}
 /* Анимации */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fadeIn {
