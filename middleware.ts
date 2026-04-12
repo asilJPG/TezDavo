@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({ name, value: "", ...options });
         },
       },
-    }
+    },
   );
 
   const {
@@ -67,5 +67,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth).*)"],
+  // Исключаем ВСЕ api роуты из middleware — они сами проверяют авторизацию
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/).*)"],
 };
