@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error || !newUser.user) {
-      // Пользователь уже существует — логиним
+      // Пользователь уже существует в auth — находим его
       const { data: session } = await supabaseAdmin.auth.admin.listUsers();
       const existing = session?.users?.find((u) => u.email === fakeEmail);
       if (!existing) {
@@ -108,6 +108,22 @@ export async function POST(req: NextRequest) {
         );
       }
       authUserId = existing.id;
+
+      // Создаём запись в users если её ещё нет
+      const { data: existingDbUser } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("auth_id", authUserId)
+        .single();
+
+      if (!existingDbUser) {
+        await supabaseAdmin.from("users").insert({
+          auth_id: authUserId,
+          full_name: fullName,
+          telegram_id: telegramId,
+          role: "user",
+        });
+      }
     } else {
       authUserId = newUser.user.id;
 
