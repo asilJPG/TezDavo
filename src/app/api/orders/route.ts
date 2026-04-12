@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: dbUser } = await supabase
+  const supabaseAdmin = getAdminClient();
+
+  const { data: dbUser } = await supabaseAdmin
     .from("users")
     .select("id, role")
     .eq("auth_id", user.id)
@@ -25,7 +27,6 @@ export async function GET(req: NextRequest) {
   if (!dbUser)
     return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  const supabaseAdmin = getAdminClient();
   let query = supabaseAdmin
     .from("orders")
     .select(
@@ -60,7 +61,9 @@ export async function POST(req: NextRequest) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: dbUser } = await supabase
+  const supabaseAdmin = getAdminClient();
+
+  const { data: dbUser } = await supabaseAdmin
     .from("users")
     .select("id")
     .eq("auth_id", user.id)
@@ -86,9 +89,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabaseAdmin = getAdminClient();
-
-  // Проверяем инвентарь
   const inventoryIds = items.map(
     (i: { inventory_id: string }) => i.inventory_id,
   );
